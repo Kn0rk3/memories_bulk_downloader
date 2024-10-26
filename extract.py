@@ -3,6 +3,9 @@ import requests
 from bs4 import BeautifulSoup
 import re
 from urllib.parse import urlparse, parse_qs
+import timeit
+
+start = timeit.default_timer()
 
 # Directory to save downloaded memories
 output_directory = "snapchat_memories"
@@ -22,7 +25,7 @@ headers = {
 }
 
 # Initialize a counter for the test limit
-download_limit = 10
+download_limit = 1000
 counter = 0
 
 # Process each link
@@ -66,3 +69,6 @@ for index, link in enumerate(links):
                 print(f"Failed to download memory {index + 1}: Status {download_response.status_code}")
         else:
             print(f"Failed to retrieve download link for memory {index + 1}: Status {response.status_code}")
+
+stop = timeit.default_timer()
+print('Time: ', stop - start)  
