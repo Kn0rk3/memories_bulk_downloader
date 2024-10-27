@@ -1,3 +1,6 @@
 .venv/*
-snapchat_memories/*
+.venv
+snapchat_memories_1
+snapchat_memories_1/*
 memories_history.html
+download_log.txt
