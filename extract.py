@@ -5,7 +5,10 @@ import re
 from urllib.parse import urlparse, parse_qs
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import timeit
-import imghdr
+from datetime import datetime as dt
+import psutil
+from PIL import Image
+import io
 
 start = timeit.default_timer()
 
@@ -26,17 +29,51 @@ headers = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/87.0.4280.88 Safari/537.36",
 }
 
+# Function to determine optimal worker count based on system load
+def determine_worker_count():
+    # Base worker count on logical cores
+    cpu_cores = os.cpu_count()
+    cpu_usage = psutil.cpu_percent(interval=1)
+    memory_info = psutil.virtual_memory()
+    memory_usage = memory_info.percent
+
+    # Set min and max worker limits
+    min_workers = max(1, cpu_cores // 2)
+    max_workers = min(32, cpu_cores * 2)
+
+    # Adjust worker count based on CPU and memory load
+    if cpu_usage > 70 or memory_usage > 80:
+        worker_count = min_workers
+    elif cpu_usage < 40 and memory_usage < 60:
+        worker_count = max_workers
+    else:
+        worker_count = cpu_cores
+
+    print(f"Optimal worker count determined: {worker_count} (CPU: {cpu_usage}%, Memory: {memory_usage}%)")
+    return worker_count
+
+# Determine the optimal number of workers for this session
+worker_count = determine_worker_count()
+
 # Define the start and end indices for processing
-start_index = 501   # Change this to start from a different index if needed
+start_index = 10001   # Change this to start from a different index if needed
 chunk_size = 70000  # Number of links to process in this batch
 end_index = min(start_index + chunk_size, len(links))  # Calculate end index based on chunk size
 
 # Limit the number of downloads for testing
 links = links[start_index:end_index]
 
-# Function to handle each download
-def download_memory(link, index):
-    match = re.search(r"downloadMemories\('(.+?)'\)", link["href"])
+# Update parse_metadata to take entry as input and parse locally within each thread
+def parse_metadata(entry):
+    date_time = entry.find_next("td").text.strip()  # Date and time
+    media_type = entry.find_next("td").find_next("td").text.strip()  # Image or Video
+    return date_time, media_type
+
+# Update download_memory to call parse_metadata with individual entry
+def download_memory(entry, index):
+    date_time, media_type = parse_metadata(entry)  # Each thread gets its own entry
+
+    match = re.search(r"downloadMemories\('(.+?)'\)", entry["href"])
     if not match:
         return f"Memory {index + 1}: Invalid link"
 
@@ -62,27 +99,35 @@ def download_memory(link, index):
     if download_response.status_code != 200:
         return f"Memory {index + 1}: Failed to download, Status {download_response.status_code}"
 
-    # Step 3: Check file type with imghdr for images
-    file_extension = ".mp4"  # Default to video
+    # Detect file type with Pillow
     file_content = download_response.content
-
-    # Use imghdr to detect image type, if any
-    if imghdr.what(None, file_content):
-        file_extension = ".jpg"
+    try:
+        image = Image.open(io.BytesIO(file_content))
+        file_extension = ".jpg" if image.format == "JPEG" else f".{image.format.lower()}"
+    except (IOError, AttributeError):
+        # Assume video if Pillow cannot open as an image
+        file_extension = ".mp4"
 
     # Save the file with the correct extension
     filename = f"memory_{index + 1}{file_extension}"
     file_path = os.path.join(output_directory, filename)
     with open(file_path, "wb") as memory_file:
-        memory_file.write(download_response.content)
+        memory_file.write(file_content)
+
+    # Format the date_time string and set the file timestamps
+    dt_obj = dt.strptime(date_time, "%Y-%m-%d %H:%M:%S UTC")
+    timestamp = dt_obj.timestamp()
+
+    # Apply the timestamp as the file's last modified and last access times
+    os.utime(file_path, (timestamp, timestamp))
 
     return f"Downloaded memory {index + 1}: {filename}"
 
 # Run downloads in parallel with a ThreadPoolExecutor
 results = []
-with ThreadPoolExecutor(max_workers=12) as executor:
-    # Map each link to the download_memory function, adjusting index based on start_index
-    future_to_index = {executor.submit(download_memory, link, start_index + i): start_index + i for i, link in enumerate(links)}
+with ThreadPoolExecutor(max_workers=worker_count) as executor:
+    # Pass each link directly to download_memory to ensure each thread works with its own entry
+    future_to_index = {executor.submit(download_memory, entry, start_index + i): start_index + i for i, entry in enumerate(links)}
 
     for future in as_completed(future_to_index):
         try:
