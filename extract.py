@@ -13,7 +13,7 @@ import io
 start = timeit.default_timer()
 
 # Directory to save downloaded memories
-output_directory = "snapchat_memories_1"
+output_directory = "snapchat_memories"
 os.makedirs(output_directory, exist_ok=True)
 
 # Load the HTML file
@@ -56,8 +56,8 @@ def determine_worker_count():
 worker_count = determine_worker_count()
 
 # Define the start and end indices for processing
-start_index = 10001   # Change this to start from a different index if needed
-chunk_size = 70000  # Number of links to process in this batch
+start_index = 0    # Change this to start from a different index if needed
+chunk_size = 100  # Number of links to process in this batch
 end_index = min(start_index + chunk_size, len(links))  # Calculate end index based on chunk size
 
 # Limit the number of downloads for testing
