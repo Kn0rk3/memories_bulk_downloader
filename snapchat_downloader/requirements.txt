@@ -1,0 +1,4 @@
+django
+celery
+requests
+beautifulsoup4

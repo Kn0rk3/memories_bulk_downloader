@@ -1,0 +1,18 @@
+<h2>Download Status</h2>
+<p>Task ID: {{ task_id }}</p>
+<p>Status: <span id="status">Pending</span></p>
+
+<script>
+    function checkStatus() {
+        fetch(`/task-status/?task_id={{ task_id }}`)
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById('status').textContent = data.status;
+                if (data.status === 'SUCCESS' || data.status === 'FAILURE') {
+                    clearInterval(statusInterval);
+                }
+            });
+    }
+
+    const statusInterval = setInterval(checkStatus, 1000);
+</script>

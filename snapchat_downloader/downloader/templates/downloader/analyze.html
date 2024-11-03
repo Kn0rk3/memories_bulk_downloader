@@ -1,0 +1,51 @@
+<h2>Select Months for Download</h2>
+<form id="downloadForm">
+    <ul>
+        {% for year, months in link_tree.items %}
+        <li>
+            <strong>{{ year }}</strong>
+            <ul>
+                {% for month, count in months.items %}
+                <li>
+                    <label>
+                        <input type="checkbox" class="month-checkbox" data-year="{{ year }}" data-month="{{ month }}">
+                        {{ month }} ({{ count }} memories)
+                    </label>
+                </li>
+                {% endfor %}
+            </ul>
+        </li>
+        {% endfor %}
+    </ul>
+    <button type="button" onclick="downloadSelected()">Download Selected</button>
+</form>
+
+<script>
+    function downloadSelected() {
+        // Collect selected months
+        const selectedMonths = [];
+        const checkboxes = document.querySelectorAll('.month-checkbox:checked');
+
+        checkboxes.forEach(checkbox => {
+            selectedMonths.push({
+                year: checkbox.getAttribute('data-year'),
+                month: checkbox.getAttribute('data-month')
+            });
+        });
+
+        // Send selected months to the backend for processing
+        fetch('{% url "start_bulk_download" %}', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': '{{ csrf_token }}'
+            },
+            body: JSON.stringify({ selectedMonths })
+        })
+        .then(response => response.json())
+        .then(data => {
+            alert(data.message || "Download initiated!");
+        })
+        .catch(error => console.error("Error:", error));
+    }
+</script>

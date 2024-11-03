@@ -4,3 +4,9 @@ snapchat_memories
 snapchat_memories/*
 memories_history.html
 download_log.txt
+*/__pycache__/*
+snapchat_downloader/downloader/__pycache__/*
+snapchat_downloader/downloader/migrations/__pycache__/*
+snapchat_downloader/snapchat_downloader/__pycache__/*
+snapchat_downloader/uploads/*
+snapchat_downloader/db.sqlite3
