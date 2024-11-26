@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Download Snapchat Memories</title>
+    <script>
+        function downloadMemories(url, filename) {
+            var parts = url.split("?");
+            var xhttp = new XMLHttpRequest();
+            xhttp.open("POST", parts[0], true);
+            xhttp.responseType = "blob";
+            xhttp.onload = function () {
+                if (xhttp.status === 200) {
+                    var blob = xhttp.response;
+                    var link = document.createElement("a");
+                    link.href = URL.createObjectURL(blob);
+                    link.download = filename;
+                    link.click();
+                } else {
+                    console.error("Failed to download memory. Status: " + xhttp.status);
+                }
+            };
+            xhttp.onerror = function () {
+                console.error("An error occurred while downloading the memory.");
+            };
+            xhttp.setRequestHeader("Content-type", "application/x-www-form-urlencoded");
+            xhttp.send(parts[1]);
+        }
+
+        function downloadSelectedMemories() {
+            var selectedLinks = document.querySelectorAll('input[name="selected_links"]:checked');
+            selectedLinks.forEach(function (checkbox, index) {
+                var linkElement = checkbox.parentNode.querySelector('a');
+                if (linkElement) {
+                    var url = linkElement.getAttribute('href').match(/downloadMemories\('(.+?)'\)/)[1];
+                    var filename = "memory_" + (index + 1) + ".jpg";
+                    downloadMemories(url, filename);
+                }
+            });
+        }
+    </script>
+</head>
+<body>
+    <h1>Select Snapchat Memories to Download</h1>
+    <form>
+        {% csrf_token %}
+        <ul>
+        {% for year, months in grouped_links.items %}
+            <li>
+                <input type="checkbox" name="selected_links" value="{{ year }}"> {{ year }}
+                <ul>
+                {% for month, links in months.items %}
+                    <li>
+                        <input type="checkbox" name="selected_links" value="{{ year }}-{{ month }}"> {{ month }} ({{ links|length }} files)
+                        <ul>
+                        {% for link in links %}
+                            <li>{{ link|safe }}</li>
+                        {% endfor %}
+                        </ul>
+                    </li>
+                {% endfor %}
+                </ul>
+            </li>
+        {% endfor %}
+        </ul>
+        <button type="button" onclick="downloadSelectedMemories()">Download Selected</button>
+    </form>
+</body>
+</html>

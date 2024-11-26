@@ -1,6 +1,14 @@
-<h2>Upload Snapchat Memories HTML File</h2>
-<form method="post" enctype="multipart/form-data">
-    {% csrf_token %}
-    {{ form.as_p }}
-    <button type="submit">Upload</button>
-</form>
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Snapchat Memories Downloader</title>
+</head>
+<body>
+    <h1>Upload Snapchat Memories HTML File</h1>
+    <form method="post" enctype="multipart/form-data">
+        {% csrf_token %}
+        <input type="file" name="html_file" accept=".html">
+        <button type="submit">Upload</button>
+    </form>
+</body>
+</html>

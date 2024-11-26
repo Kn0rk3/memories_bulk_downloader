@@ -1,67 +1,42 @@
-from django.shortcuts import render
-from .forms import MemoryUploadForm
-from .tasks import download_memory_task
-from celery.result import AsyncResult
-from .utils import analyze_links
-from django.http import JsonResponse
+from django.shortcuts import render, redirect
+from django.http import HttpResponse
+from django.template import loader
+from bs4 import BeautifulSoup
+import re
 
-def upload_memory(request):
-    if request.method == 'POST':
-        form = MemoryUploadForm(request.POST, request.FILES)
-        if form.is_valid():
-            memory_upload = form.save()
-            file_path = memory_upload.file.path
-            link_tree = analyze_links(file_path)
-            return render(request, 'downloader/analyze.html', {'link_tree': link_tree})
-    else:
-        form = MemoryUploadForm()
-    return render(request, 'downloader/upload.html', {'form': form})
-
-def initiate_download(request):
-    base_url = request.GET.get("base_url")
-    uid = request.GET.get("uid")
-    sid = request.GET.get("sid")
-    mid = request.GET.get("mid")
-    ts = request.GET.get("ts")
-    sig = request.GET.get("sig")
-    media_type = request.GET.get("media_type", "video")
-
-    params = {
-        "uid": uid,
-        "sid": sid,
-        "mid": mid,
-        "ts": ts,
-        "sig": sig
-    }
-
-    task = download_memory_task.delay(base_url, params, media_type, mid)
-    return render(request, 'downloader/download_status.html', {'task_id': task.id})
-
-def task_status(request):
-    task_id = request.GET.get('task_id')
-    task = AsyncResult(task_id)
-    return JsonResponse({'status': task.status})
-
-@csrf_exempt
-def start_bulk_download(request):
-    if request.method == 'POST':
-        data = json.loads(request.body)
-        selected_months = data.get('selectedMonths', [])
+def upload(request):
+    if request.method == 'POST' and request.FILES['html_file']:
+        html_file = request.FILES['html_file']
+        soup = BeautifulSoup(html_file, 'html.parser')
         
-        for month_data in selected_months:
-            year = month_data.get('year')
-            month = month_data.get('month')
-            
-            # Fetch all download links for the given year and month
-            download_links = get_download_links_for_month(year, month)
-            
-            # Trigger a download task for each link in the selected month
-            for link in download_links:
-                base_url = link['base_url']
-                params = link['params']
-                media_type = link['media_type']
-                mid = link['params']['mid']
-                download_memory_task.delay(base_url, params, media_type, mid)
+        # Parse the HTML and extract the download links
+        links = soup.find_all('a', href=re.compile(r'javascript:downloadMemories'))
+        
+        # Group the links by year and month
+        grouped_links = {}
+        for link in links:
+            date_time_element = link.find_next('td')
+            if date_time_element:
+                date_time = date_time_element.text.strip()
+                year, month = date_time[:4], date_time[5:7]
+                if year not in grouped_links:
+                    grouped_links[year] = {}
+                if month not in grouped_links[year]:
+                    grouped_links[year][month] = []
+                grouped_links[year][month].append(str(link))
+            else:
+                print(f"Warning: Date and time not found for link: {link}")
+        
+        # Store the grouped links in the session
+        request.session['grouped_links'] = grouped_links
+        
+        # Redirect to the download page
+        return redirect('download')
+    
+    return render(request, 'downloader/upload.html')
 
-        return JsonResponse({"message": "Download tasks have been initiated for the selected months."})
-    return JsonResponse({"error": "Invalid request method."}, status=400)
+def download(request):
+    # Render the download.html template with the grouped links
+    template = loader.get_template('downloader/download.html')
+    context = {'grouped_links': request.session.get('grouped_links', {})}
+    return HttpResponse(template.render(context, request))
