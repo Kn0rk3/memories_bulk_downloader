@@ -15,3 +15,10 @@ snapchat_downloader
 - python manage.py migrate
 - python manage.py showmigrations
 - python manage.py runserver
+
+
+## Notes to do
+
+- date and time of the picture should be the correct one if possible
+- remove batching if no longer needed
+- check if the download can be done locally and not on the server - but this would mean to exclude the logic onto javascript again

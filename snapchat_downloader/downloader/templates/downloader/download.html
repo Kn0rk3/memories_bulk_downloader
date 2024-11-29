@@ -2,67 +2,251 @@
 <html>
 <head>
     <title>Download Snapchat Memories</title>
+    <meta name="csrf-token" content="{{ csrf_token }}">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+        .status {
+            margin: 20px 0;
+            padding: 10px;
+            border: 1px solid #ccc;
+            background: #f9f9f9;
+            border-radius: 4px;
+        }
+        .download-list {
+            margin: 20px 0;
+        }
+        .download-list ul {
+            list-style-type: none;
+            padding-left: 20px;
+        }
+        .month-item {
+            margin: 5px 0;
+        }
+        button {
+            padding: 10px 20px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        button:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+    </style>
     <script>
-        function downloadMemories(url, filename) {
-            var parts = url.split("?");
-            var xhttp = new XMLHttpRequest();
-            xhttp.open("POST", parts[0], true);
-            xhttp.responseType = "blob";
-            xhttp.onload = function () {
-                if (xhttp.status === 200) {
-                    var blob = xhttp.response;
-                    var link = document.createElement("a");
-                    link.href = URL.createObjectURL(blob);
-                    link.download = filename;
-                    link.click();
-                } else {
-                    console.error("Failed to download memory. Status: " + xhttp.status);
+        function createMonthlyZips() {
+            const zips = new Map();
+
+            function getOrCreateZip(year, month) {
+                const key = `${year}-${month}`;
+                if (!zips.has(key)) {
+                    zips.set(key, new JSZip());
                 }
-            };
-            xhttp.onerror = function () {
-                console.error("An error occurred while downloading the memory.");
-            };
-            xhttp.setRequestHeader("Content-type", "application/x-www-form-urlencoded");
-            xhttp.send(parts[1]);
+                return zips.get(key);
+            }
+
+            async function downloadMemory(url) {
+                try {
+                    const response = await fetch('/download-file/', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                        },
+                        body: JSON.stringify({ url: url })
+                    });
+
+                    const data = await response.json();
+                    if (data.success) {
+                        return {
+                            content: data.content,
+                            extension: data.extension
+                        };
+                    } else {
+                        console.error('Download failed:', data.error);
+                        return null;
+                    }
+                } catch (error) {
+                    console.error('Error:', error);
+                    return null;
+                }
+            }
+
+            async function downloadZip(yearMonth, zip) {
+                try {
+                    const [year, month] = yearMonth.split('-');
+                    const content = await zip.generateAsync({
+                        type: "blob",
+                        compression: "DEFLATE",
+                        compressionOptions: {
+                            level: 9
+                        }
+                    });
+                    
+                    const link = document.createElement('a');
+                    link.href = URL.createObjectURL(content);
+                    link.download = `snapchat_memories_${year}_${month}.zip`;
+                    link.click();
+                    URL.revokeObjectURL(link.href);
+                } catch (error) {
+                    console.error(`Error creating zip for ${yearMonth}:`, error);
+                }
+            }
+
+            function downloadSelectedMemories() {
+                const selectedYears = Array.from(document.querySelectorAll('input[name="selected_years"]:checked'))
+                    .map(checkbox => checkbox.value);
+                const selectedMonths = Array.from(document.querySelectorAll('input[name="selected_months"]:checked'))
+                    .map(checkbox => checkbox.value);
+                
+                if (selectedYears.length === 0 && selectedMonths.length === 0) {
+                    alert('Please select at least one year or month to download');
+                    return;
+                }
+
+                const downloadButton = document.getElementById('downloadButton');
+                downloadButton.disabled = true;
+                
+                let batchSize = 50;
+                let currentBatch = 0;
+                let totalFiles = 0;
+                let processedFiles = 0;
+                
+                let statusDiv = document.getElementById('downloadStatus');
+                if (!statusDiv) {
+                    statusDiv = document.createElement('div');
+                    statusDiv.id = 'downloadStatus';
+                    statusDiv.className = 'status';
+                    document.querySelector('.download-list').appendChild(statusDiv);
+                }
+                
+                async function updateStatus() {
+                    const percent = totalFiles ? Math.round((processedFiles / totalFiles) * 100) : 0;
+                    statusDiv.textContent = `Processing: ${processedFiles}/${totalFiles} files (${percent}%)`;
+                }
+
+                async function processBatch(selected_links) {
+                    const promises = [];
+                    
+                    for (let i = 0; i < selected_links.length; i++) {
+                        const linkHtml = selected_links[i];
+                        const linkElement = document.createElement('div');
+                        linkElement.innerHTML = linkHtml;
+                        const linkAnchor = linkElement.querySelector('a');
+                        
+                        if (linkAnchor) {
+                            const linkHref = linkAnchor.getAttribute('href');
+                            const url = linkHref.match(/downloadMemories\('(.+?)'\)/)[1];
+                            const yearMonth = linkAnchor.getAttribute('data-yearmonth');
+                            
+                            if (yearMonth) {
+                                const [year, month] = yearMonth.split('-');
+                                
+                                const promise = downloadMemory(url).then(response => {
+                                    if (response && response.content) {
+                                        const zip = getOrCreateZip(year, month);
+                                        const filename = `memory_${(currentBatch * batchSize + i + 1)}${response.extension}`;
+                                        zip.file(filename, response.content, {base64: true});
+                                        processedFiles++;
+                                        updateStatus();
+                                    }
+                                });
+                                promises.push(promise);
+                            }
+                        }
+                    }
+                    
+                    await Promise.all(promises);
+                }
+
+                async function downloadBatch() {
+                    try {
+                        const response = await fetch('/download/', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                            },
+                            body: JSON.stringify({
+                                years: selectedYears,
+                                months: selectedMonths,
+                                offset: currentBatch * batchSize,
+                                limit: batchSize
+                            })
+                        });
+                        
+                        const data = await response.json();
+                        totalFiles = data.total_links;
+                        updateStatus();
+                        
+                        await processBatch(data.selected_links);
+                        
+                        currentBatch++;
+                        if (currentBatch * batchSize < data.total_links) {
+                            setTimeout(downloadBatch, 2000);
+                        } else {
+                            statusDiv.textContent = 'Creating ZIP files...';
+                            
+                            for (const [yearMonth, zip] of zips) {
+                                await downloadZip(yearMonth, zip);
+                            }
+                            
+                            statusDiv.textContent = 'Download complete!';
+                            downloadButton.disabled = false;
+                            setTimeout(() => statusDiv.remove(), 5000);
+                        }
+                    } catch (error) {
+                        console.error('Error:', error);
+                        statusDiv.textContent = 'Error during download. Check console for details.';
+                        downloadButton.disabled = false;
+                    }
+                }
+
+                downloadBatch();
+            }
+
+            const downloadButton = document.getElementById('downloadButton');
+            if (downloadButton) {
+                downloadButton.onclick = downloadSelectedMemories;
+            }
         }
 
-        function downloadSelectedMemories() {
-            var selectedLinks = document.querySelectorAll('input[name="selected_links"]:checked');
-            selectedLinks.forEach(function (checkbox, index) {
-                var linkElement = checkbox.parentNode.querySelector('a');
-                if (linkElement) {
-                    var url = linkElement.getAttribute('href').match(/downloadMemories\('(.+?)'\)/)[1];
-                    var filename = "memory_" + (index + 1) + ".jpg";
-                    downloadMemories(url, filename);
-                }
-            });
-        }
+        document.addEventListener('DOMContentLoaded', createMonthlyZips);
     </script>
 </head>
 <body>
     <h1>Select Snapchat Memories to Download</h1>
-    <form>
-        {% csrf_token %}
-        <ul>
-        {% for year, months in grouped_links.items %}
-            <li>
-                <input type="checkbox" name="selected_links" value="{{ year }}"> {{ year }}
+    <div class="download-list">
+        <form>
+            {% if links_count %}
                 <ul>
-                {% for month, links in months.items %}
+                {% for year, months in links_count.items %}
                     <li>
-                        <input type="checkbox" name="selected_links" value="{{ year }}-{{ month }}"> {{ month }} ({{ links|length }} files)
+                        <input type="checkbox" name="selected_years" value="{{ year }}"> {{ year }}
                         <ul>
-                        {% for link in links %}
-                            <li>{{ link|safe }}</li>
+                        {% for month, count in months.items %}
+                            <li class="month-item">
+                                <input type="checkbox" name="selected_months" value="{{ year }}-{{ month }}"> {{ month }} ({{ count }} media files)
+                            </li>
                         {% endfor %}
                         </ul>
                     </li>
                 {% endfor %}
                 </ul>
-            </li>
-        {% endfor %}
-        </ul>
-        <button type="button" onclick="downloadSelectedMemories()">Download Selected</button>
-    </form>
+                <button type="button" id="downloadButton">Download Selected</button>
+            {% else %}
+                <p>No memories found.</p>
+            {% endif %}
+        </form>
+    </div>
 </body>
 </html>
