@@ -18,7 +18,6 @@ snapchat_downloader
 
 
 ## Notes to do
-
-- date and time of the picture should be the correct one if possible
-- remove batching if no longer needed
-- check if the download can be done locally and not on the server - but this would mean to exclude the logic onto javascript again
+- current direct function works in firefox not - mp4 canot be decoded but in Edge it works
+- in edge the tracking has to be ausgewogen to work - strict does not work but this is ok and something local. But we should note this on the page
+- both options are now working in edge but are quite slow- both need to be parallizd if possible

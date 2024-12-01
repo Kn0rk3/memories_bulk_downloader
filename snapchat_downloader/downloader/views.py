@@ -60,8 +60,6 @@ def download(request):
             data = json.loads(request.body)
             selected_years = data.get('years', [])
             selected_months = data.get('months', [])
-            offset = data.get('offset', 0)
-            limit = data.get('limit', 100)
             
             grouped_links = request.session.get('grouped_links', {})
             selected_links = []
@@ -77,13 +75,20 @@ def download(request):
                         selected_links.extend(grouped_links[year][month])
             
             total_links = len(selected_links)
-            selected_links = selected_links[offset:offset+limit]
             
-            return JsonResponse({'selected_links': selected_links, 'total_links': total_links})
+            return JsonResponse({
+                'selected_links': selected_links, 
+                'total_links': total_links
+            })
+            
         except json.JSONDecodeError as e:
-            return JsonResponse({'error': f'JSON decode error: {str(e)}'}, status=400)
+            return JsonResponse({
+                'error': f'JSON decode error: {str(e)}'
+            }, status=400)
         except Exception as e:
-            return JsonResponse({'error': f'Server error: {str(e)}'}, status=500)
+            return JsonResponse({
+                'error': f'Server error: {str(e)}'
+            }, status=500)
     
     return JsonResponse({'error': 'Invalid request'}, status=400)
 

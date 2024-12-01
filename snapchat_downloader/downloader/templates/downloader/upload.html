@@ -1,14 +1,62 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Snapchat Memories Downloader</title>
+    <title>Upload Snapchat Memories HTML</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .upload-container {
+            margin: 20px 0;
+            padding: 20px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            background-color: #f9f9f9;
+        }
+        .instructions {
+            margin-bottom: 20px;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        button {
+            padding: 10px 20px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+    </style>
 </head>
 <body>
-    <h1>Upload Snapchat Memories HTML File</h1>
-    <form method="post" enctype="multipart/form-data">
-        {% csrf_token %}
-        <input type="file" name="html_file" accept=".html">
-        <button type="submit">Upload</button>
-    </form>
+    <h1>Upload Snapchat Memories HTML</h1>
+    
+    <div class="instructions">
+        <h2>Instructions:</h2>
+        <ol>
+            <li>Go to your Snapchat Memories export webpage</li>
+            <li>Save the complete webpage (HTML only)</li>
+            <li>Upload the saved HTML file below</li>
+        </ol>
+    </div>
+
+    <div class="upload-container">
+        <form method="post" enctype="multipart/form-data">
+            {% csrf_token %}
+            <div class="form-group">
+                <label for="html_file">Select HTML file:</label><br>
+                <input type="file" id="html_file" name="html_file" accept=".html,.htm" required>
+            </div>
+            <button type="submit">Upload</button>
+        </form>
+    </div>
 </body>
 </html>
