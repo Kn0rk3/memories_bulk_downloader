@@ -201,16 +201,10 @@ async function processZipDownloads(selected_links) {
     updateStatus();
 
     const zips = new Map();
+    const urls = [];
 
-    function getOrCreateZip(year, month) {
-        const key = `${year}-${month}`;
-        if (!zips.has(key)) {
-            zips.set(key, new JSZip());
-        }
-        return zips.get(key);
-    }
-
-    for (const [index, linkHtml] of selected_links.entries()) {
+    // Prepare URLs
+    for (const linkHtml of selected_links) {
         const linkElement = document.createElement('div');
         linkElement.innerHTML = linkHtml;
         const linkAnchor = linkElement.querySelector('a');
@@ -218,24 +212,51 @@ async function processZipDownloads(selected_links) {
         if (linkAnchor) {
             const linkHref = linkAnchor.getAttribute('href');
             const url = linkHref.match(/downloadMemories\('(.+?)'\)/)[1];
-            const yearMonth = linkAnchor.getAttribute('data-yearmonth');
+            urls.push(url);
+        }
+    }
+
+    statusDiv.querySelector('.status-text').textContent = `Starting download of ${totalFiles} files...`;
+    statusDiv.querySelector('.progress-bar').style.width = '20%';
+
+    // Process files in batches
+    const response = await fetch('/batch-download/', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+        },
+        body: JSON.stringify({ urls: urls })
+    });
+
+    const data = await response.json();
+    if (data.success) {
+
+        statusDiv.querySelector('.status-text').textContent = 'Processing downloaded files...';
+        statusDiv.querySelector('.progress-bar').style.width = '80%';
             
-            if (yearMonth) {
+        // Process results
+        for (let i = 0; i < data.results.length; i++) {
+            const result = data.results[i];
+            if (result.success) {
+                const yearMonth = selected_links[i].match(/data-yearmonth="([^"]+)"/)[1];
                 const [year, month] = yearMonth.split('-');
-                try {
-                    const response = await downloadMemory(url);
-                    if (response) {
-                        const zip = getOrCreateZip(year, month);
-                        const filename = `memory_${index + 1}${response.extension}`;
-                        zip.file(filename, response.content, { base64: true });
-                        processedFiles++;
-                        updateStatus();
-                    }
-                } catch (error) {
-                    console.error('Download failed:', error);
-                }
+                
+                const zip = getOrCreateZip(year, month);
+                const filename = `memory_${i + 1}${result.extension}`;
+                zip.file(filename, result.content, { base64: true });
+                processedFiles++;
+                updateStatus();
             }
         }
+    }
+
+    function getOrCreateZip(year, month) {
+        const key = `${year}-${month}`;
+        if (!zips.has(key)) {
+            zips.set(key, new JSZip());
+        }
+        return zips.get(key);
     }
 
     statusDiv.querySelector('.status-text').textContent = 'Creating ZIP files...';

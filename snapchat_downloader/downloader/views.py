@@ -21,9 +21,9 @@ def determine_worker_count():
     memory_info = psutil.virtual_memory()
     memory_usage = memory_info.percent
 
-    # Set min and max worker limits
-    min_workers = max(1, cpu_cores // 2)
-    max_workers = min(32, cpu_cores * 2)
+    # More conservative limits
+    min_workers = max(1, cpu_cores // 4)  # Using 1/4 of cores as minimum
+    max_workers = min(16, cpu_cores)      # Using core count as maximum, capped at 16
 
     # Adjust worker count based on CPU and memory load
     if cpu_usage > 70 or memory_usage > 80:
@@ -31,7 +31,7 @@ def determine_worker_count():
     elif cpu_usage < 40 and memory_usage < 60:
         worker_count = max_workers
     else:
-        worker_count = cpu_cores
+        worker_count = cpu_cores // 2  # Using half of cores as default
 
     print(f"Optimal worker count determined: {worker_count} (CPU: {cpu_usage}%, Memory: {memory_usage}%)")
     return worker_count
@@ -128,54 +128,43 @@ def download_file(request):
             if not url:
                 return JsonResponse({'success': False, 'error': 'URL is required'})
             
-            # Parse the URL and parameters
-            url_parts = url.split('?')
-            base_url = url_parts[0]
-            params = url_parts[1] if len(url_parts) > 1 else ''
-            
-            # First request to get the media URL
-            response = requests.post(
-                base_url, 
-                data=params,
-                headers={'Content-Type': 'application/x-www-form-urlencoded'}
-            )
-            
-            if response.status_code == 200:
-                # Get the media URL from response
-                media_url = response.text.strip()
+            def process_single_file(url):
+                # Parse the URL and parameters
+                url_parts = url.split('?')
+                base_url = url_parts[0]
+                params = url_parts[1] if len(url_parts) > 1 else ''
                 
-                # Second request to get the actual media content
-                media_response = requests.get(media_url)
+                # Get media URL
+                response = requests.post(
+                    base_url, 
+                    data=params,
+                    headers={'Content-Type': 'application/x-www-form-urlencoded'}
+                )
                 
-                if media_response.status_code == 200:
-                    file_content = media_response.content
+                if response.status_code == 200:
+                    media_url = response.text.strip()
+                    media_response = requests.get(media_url)
                     
-                    # Detect file type using Pillow
-                    try:
-                        image = Image.open(io.BytesIO(file_content))
-                        file_extension = ".jpg" if image.format == "JPEG" else f".{image.format.lower()}"
-                    except (IOError, AttributeError):
-                        # If Pillow cannot open it as an image, assume it's a video
-                        file_extension = ".mov"
-                    
-                    # Convert binary content to base64
-                    content_b64 = base64.b64encode(file_content).decode('utf-8')
-                    
-                    return JsonResponse({
-                        'success': True,
-                        'content': content_b64,
-                        'extension': file_extension
-                    })
-                else:
-                    return JsonResponse({
-                        'success': False,
-                        'error': f'Failed to download media: {media_response.status_code}'
-                    })
-            else:
-                return JsonResponse({
-                    'success': False,
-                    'error': f'Failed to get media URL: {response.status_code}'
-                })
+                    if media_response.status_code == 200:
+                        file_content = media_response.content
+                        
+                        try:
+                            image = Image.open(io.BytesIO(file_content))
+                            file_extension = ".jpg" if image.format == "JPEG" else f".{image.format.lower()}"
+                        except (IOError, AttributeError):
+                            file_extension = ".mov"
+                        
+                        return {
+                            'success': True,
+                            'content': base64.b64encode(file_content).decode('utf-8'),
+                            'extension': file_extension
+                        }
+                
+                return {'success': False, 'error': 'Download failed'}
+
+            # Process single file
+            result = process_single_file(url)
+            return JsonResponse(result)
                 
         except Exception as e:
             return JsonResponse({
@@ -184,3 +173,82 @@ def download_file(request):
             })
     
     return JsonResponse({'error': 'Invalid request method'}, status=400)
+
+@csrf_exempt
+def batch_download(request):
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            urls = data.get('urls', [])
+            
+            if not urls:
+                return JsonResponse({'success': False, 'error': 'URLs required'})
+
+            worker_count = determine_worker_count()
+            print(f"Processing {len(urls)} files with {worker_count} workers")
+            
+            results = []
+            completed = 0
+            total = len(urls)
+
+            with ThreadPoolExecutor(max_workers=worker_count) as executor:
+                futures = [executor.submit(download_single_file, url) for url in urls]
+                for future in as_completed(futures):
+                    try:
+                        result = future.result()
+                        results.append(result)
+                        completed += 1
+                        if completed % 5 == 0:  # Log progress every 5 files
+                            print(f"Progress: {completed}/{total} files processed")
+                    except Exception as e:
+                        results.append({
+                            'success': False,
+                            'error': str(e)
+                        })
+            
+            return JsonResponse({
+                'success': True,
+                'results': results
+            })
+                
+        except Exception as e:
+            return JsonResponse({
+                'success': False,
+                'error': f'Server error: {str(e)}'
+            })
+    
+    return JsonResponse({'error': 'Invalid request method'}, status=400)
+
+def download_single_file(url):
+    # Parse the URL and parameters
+    url_parts = url.split('?')
+    base_url = url_parts[0]
+    params = url_parts[1] if len(url_parts) > 1 else ''
+    
+    # Get media URL
+    response = requests.post(
+        base_url, 
+        data=params,
+        headers={'Content-Type': 'application/x-www-form-urlencoded'}
+    )
+    
+    if response.status_code == 200:
+        media_url = response.text.strip()
+        media_response = requests.get(media_url)
+        
+        if media_response.status_code == 200:
+            file_content = media_response.content
+            
+            try:
+                image = Image.open(io.BytesIO(file_content))
+                file_extension = ".jpg" if image.format == "JPEG" else f".{image.format.lower()}"
+            except (IOError, AttributeError):
+                file_extension = ".mov"
+            
+            return {
+                'success': True,
+                'content': base64.b64encode(file_content).decode('utf-8'),
+                'extension': file_extension
+            }
+    
+    return {'success': False, 'error': 'Download failed'}
