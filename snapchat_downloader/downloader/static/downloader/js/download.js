@@ -1,50 +1,147 @@
-// Direct download function (Snapchat's approach)
-function directDownloadMemory(url) {
-    return new Promise((resolve, reject) => {
-        const parts = url.split("?");
-        const xhttp = new XMLHttpRequest();
-        xhttp.open("POST", parts[0], true);
-        xhttp.setRequestHeader("Content-type", "application/x-www-form-urlencoded");
-        
-        xhttp.onreadystatechange = function () {
-            if (xhttp.readyState == 4) {
-                if (xhttp.status == 200) {
-                    // Create hidden iframe for download
-                    const iframe = document.createElement('iframe');
-                    iframe.style.display = 'none';
-                    document.body.appendChild(iframe);
-                    
-                    try {
-                        // Write a download link into the iframe and click it
-                        iframe.contentWindow.document.write(`
-                            <a id="download" download href="${xhttp.responseText}">Download</a>
-                            <script>
-                                document.getElementById('download').click();
-                            </script>
-                        `);
-                        
-                        // Remove the iframe after a short delay
-                        setTimeout(() => {
-                            document.body.removeChild(iframe);
-                        }, 1000);
-                        
-                        resolve(true);
-                    } catch (e) {
-                        document.body.removeChild(iframe);
-                        reject(e);
-                    }
-                } else {
-                    reject(new Error('Failed to get CDN URL'));
-                }
+// ============= Direct Download Implementation =============
+class DownloadWorker {
+    constructor(maxConcurrent = 3) {
+        this.queue = [];
+        this.activeDownloads = 0;
+        this.maxConcurrent = maxConcurrent;
+    }
+
+    async addToQueue(urls) {
+        this.queue.push(...urls);
+        this.processQueue();
+    }
+
+    async processQueue() {
+        while (this.queue.length > 0 && this.activeDownloads < this.maxConcurrent) {
+            this.activeDownloads++;
+            const url = this.queue.shift();
+            try {
+                await this.downloadFile(url);
+            } finally {
+                this.activeDownloads--;
+                this.processQueue();
             }
-        };
-        
-        xhttp.send(parts[1]);
-    });
+        }
+    }
+
+    downloadFile(url) {
+        return new Promise((resolve, reject) => {
+            const parts = url.split("?");
+            const xhttp = new XMLHttpRequest();
+            xhttp.open("POST", parts[0], true);
+            xhttp.setRequestHeader("Content-type", "application/x-www-form-urlencoded");
+            
+            xhttp.onreadystatechange = function () {
+                if (xhttp.readyState == 4) {
+                    if (xhttp.status == 200) {
+                        const iframe = document.createElement('iframe');
+                        iframe.style.display = 'none';
+                        document.body.appendChild(iframe);
+                        
+                        try {
+                            iframe.contentWindow.document.write(`
+                                <a id="download" download href="${xhttp.responseText}">Download</a>
+                                <script>
+                                    document.getElementById('download').click();
+                                </script>
+                            `);
+                            
+                            setTimeout(() => {
+                                document.body.removeChild(iframe);
+                            }, 1000);
+                            
+                            resolve(true);
+                        } catch (e) {
+                            document.body.removeChild(iframe);
+                            reject(e);
+                        }
+                    } else {
+                        reject(new Error('Failed to get CDN URL'));
+                    }
+                }
+            };
+            
+            xhttp.send(parts[1]);
+        });
+    }
 }
 
+async function processDirectDownloads(selected_links, workerCount = 3) {
+    const startTime = performance.now();
+    let totalFiles = selected_links.length;
+    let processedFiles = 0;
+    
+    let statusDiv = document.getElementById('downloadStatus');
+    if (!statusDiv) {
+        statusDiv = document.createElement('div');
+        statusDiv.id = 'downloadStatus';
+        statusDiv.className = 'status';
+        document.querySelector('.download-list').appendChild(statusDiv);
+    }
 
-// Server-proxied download function for ZIP creation
+    const updateStatus = () => {
+        const percent = Math.round((processedFiles / totalFiles) * 100);
+        const duration = ((performance.now() - startTime) / 1000).toFixed(2);
+        statusDiv.textContent = `Processing: ${processedFiles}/${totalFiles} files (${percent}%) - Time: ${duration}s - Using ${workerCount} parallel downloads`;
+    };
+    updateStatus();
+
+    // Create download worker pool with user-selected count
+    const downloadWorker = new DownloadWorker(workerCount);
+    const urls = [];
+
+    // Prepare URLs
+    for (const linkHtml of selected_links) {
+        const linkElement = document.createElement('div');
+        linkElement.innerHTML = linkHtml;
+        const linkAnchor = linkElement.querySelector('a');
+        
+        if (linkAnchor) {
+            const linkHref = linkAnchor.getAttribute('href');
+            const url = linkHref.match(/downloadMemories\('(.+?)'\)/)[1];
+            urls.push(url);
+        }
+    }
+
+    // Setup progress monitoring
+    const progressInterval = setInterval(() => {
+        processedFiles = totalFiles - downloadWorker.queue.length - downloadWorker.activeDownloads;
+        updateStatus();
+        
+        if (processedFiles === totalFiles) {
+            clearInterval(progressInterval);
+            const totalDuration = ((performance.now() - startTime) / 1000).toFixed(2);
+            const filesPerSecond = (totalFiles/totalDuration).toFixed(2);
+            
+            // Update status and show performance metrics
+            statusDiv.textContent = `Downloads complete! Total time: ${totalDuration} seconds`;
+            
+            const performanceLog = document.getElementById('performanceLog');
+            const performanceDetails = document.getElementById('performanceDetails');
+            performanceLog.style.display = "block";
+            performanceDetails.innerHTML = `
+                <p>📊 Total files processed: ${totalFiles}</p>
+                <p>⏱️ Total time: ${totalDuration} seconds</p>
+                <p>⚡ Average speed: ${filesPerSecond} files/second</p>
+                <p>🔄 Parallel downloads used: ${workerCount}</p>
+            `;
+            
+            // Also log to console
+            console.log('Download Performance Metrics:');
+            console.log(`Total files processed: ${totalFiles}`);
+            console.log(`Total time: ${totalDuration} seconds`);
+            console.log(`Average speed: ${filesPerSecond} files/second`);
+            console.log(`Parallel downloads used: ${workerCount}`);
+            
+            setTimeout(() => statusDiv.remove(), 5000);
+        }
+    }, 100);
+
+    // Start downloads
+    await downloadWorker.addToQueue(urls);
+}
+
+// ============= ZIP Download Implementation =============
 async function downloadMemory(url) {
     try {
         const response = await fetch('/download-file/', {
@@ -72,52 +169,6 @@ async function downloadMemory(url) {
     }
 }
 
-
-// Function to process direct downloads
-async function processDirectDownloads(selected_links) {
-    let totalFiles = selected_links.length;
-    let processedFiles = 0;
-    
-    let statusDiv = document.getElementById('downloadStatus');
-    if (!statusDiv) {
-        statusDiv = document.createElement('div');
-        statusDiv.id = 'downloadStatus';
-        statusDiv.className = 'status';
-        document.querySelector('.download-list').appendChild(statusDiv);
-    }
-
-    const updateStatus = () => {
-        const percent = Math.round((processedFiles / totalFiles) * 100);
-        statusDiv.textContent = `Processing: ${processedFiles}/${totalFiles} files (${percent}%)`;
-    };
-    updateStatus();
-
-    for (const linkHtml of selected_links) {
-        const linkElement = document.createElement('div');
-        linkElement.innerHTML = linkHtml;
-        const linkAnchor = linkElement.querySelector('a');
-        
-        if (linkAnchor) {
-            const linkHref = linkAnchor.getAttribute('href');
-            const url = linkHref.match(/downloadMemories\('(.+?)'\)/)[1];
-            
-            try {
-                await directDownloadMemory(url);
-                processedFiles++;
-                updateStatus();
-                // Add small delay between downloads
-                await new Promise(resolve => setTimeout(resolve, 500));
-            } catch (error) {
-                console.error('Download failed:', error);
-            }
-        }
-    }
-
-    statusDiv.textContent = 'Downloads complete!';
-    setTimeout(() => statusDiv.remove(), 5000);
-}
-
-// Function to process ZIP downloads
 async function processZipDownloads(selected_links) {
     let totalFiles = selected_links.length;
     let processedFiles = 0;
@@ -201,7 +252,7 @@ async function processZipDownloads(selected_links) {
     setTimeout(() => statusDiv.remove(), 5000);
 }
 
-// Function to get selected links from server
+// ============= Common Utilities =============
 async function getSelectedLinks() {
     const selectedYears = Array.from(document.querySelectorAll('input[name="selected_years"]:checked'))
         .map(checkbox => checkbox.value);
@@ -229,10 +280,19 @@ async function getSelectedLinks() {
     return data.selected_links;
 }
 
-// Initialize buttons when page loads
+// ============= Initialize Event Handlers =============
 document.addEventListener('DOMContentLoaded', () => {
     const directButton = document.getElementById('directDownloadButton');
     const zipButton = document.getElementById('zipDownloadButton');
+    const workerCount = document.getElementById('workerCount');
+    const workerCountDisplay = document.getElementById('workerCountDisplay');
+
+    // Update display when slider changes
+    if (workerCount) {
+        workerCount.addEventListener('input', function() {
+            workerCountDisplay.textContent = this.value;
+        });
+    }
 
     directButton.onclick = async () => {
         directButton.disabled = true;
@@ -240,7 +300,7 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             const links = await getSelectedLinks();
             if (links) {
-                await processDirectDownloads(links);
+                await processDirectDownloads(links, parseInt(workerCount.value));
             }
         } catch (error) {
             console.error('Error:', error);
