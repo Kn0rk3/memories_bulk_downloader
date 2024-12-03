@@ -10,6 +10,32 @@ from PIL import Image
 import io
 import base64
 
+import os
+import psutil
+from concurrent.futures import ThreadPoolExecutor, as_completed
+
+def determine_worker_count():
+    # Base worker count on logical cores
+    cpu_cores = os.cpu_count()
+    cpu_usage = psutil.cpu_percent(interval=1)
+    memory_info = psutil.virtual_memory()
+    memory_usage = memory_info.percent
+
+    # Set min and max worker limits
+    min_workers = max(1, cpu_cores // 2)
+    max_workers = min(32, cpu_cores * 2)
+
+    # Adjust worker count based on CPU and memory load
+    if cpu_usage > 70 or memory_usage > 80:
+        worker_count = min_workers
+    elif cpu_usage < 40 and memory_usage < 60:
+        worker_count = max_workers
+    else:
+        worker_count = cpu_cores
+
+    print(f"Optimal worker count determined: {worker_count} (CPU: {cpu_usage}%, Memory: {memory_usage}%)")
+    return worker_count
+
 def upload(request):
     if request.method == 'POST' and request.FILES.get('html_file'):
         html_file = request.FILES['html_file']

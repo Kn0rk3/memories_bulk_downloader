@@ -76,21 +76,27 @@ async function processDirectDownloads(selected_links, workerCount = 3) {
         statusDiv = document.createElement('div');
         statusDiv.id = 'downloadStatus';
         statusDiv.className = 'status';
-        document.querySelector('.download-list').appendChild(statusDiv);
+        statusDiv.innerHTML = `
+            <div class="status-text"></div>
+            <div class="progress-container">
+                <div class="progress-bar"></div>
+            </div>
+        `;
+        document.querySelector('.download-options').insertAdjacentElement('afterend', statusDiv);
     }
 
     const updateStatus = () => {
         const percent = Math.round((processedFiles / totalFiles) * 100);
         const duration = ((performance.now() - startTime) / 1000).toFixed(2);
-        statusDiv.textContent = `Processing: ${processedFiles}/${totalFiles} files (${percent}%) - Time: ${duration}s - Using ${workerCount} parallel downloads`;
+        statusDiv.querySelector('.status-text').textContent = 
+            `Processing: ${processedFiles}/${totalFiles} files (${percent}%) - Time: ${duration}s - Using ${workerCount} parallel downloads`;
+        statusDiv.querySelector('.progress-bar').style.width = `${percent}%`;
     };
     updateStatus();
 
-    // Create download worker pool with user-selected count
     const downloadWorker = new DownloadWorker(workerCount);
     const urls = [];
 
-    // Prepare URLs
     for (const linkHtml of selected_links) {
         const linkElement = document.createElement('div');
         linkElement.innerHTML = linkHtml;
@@ -103,7 +109,6 @@ async function processDirectDownloads(selected_links, workerCount = 3) {
         }
     }
 
-    // Setup progress monitoring
     const progressInterval = setInterval(() => {
         processedFiles = totalFiles - downloadWorker.queue.length - downloadWorker.activeDownloads;
         updateStatus();
@@ -113,12 +118,12 @@ async function processDirectDownloads(selected_links, workerCount = 3) {
             const totalDuration = ((performance.now() - startTime) / 1000).toFixed(2);
             const filesPerSecond = (totalFiles/totalDuration).toFixed(2);
             
-            // Update status and show performance metrics
-            statusDiv.textContent = `Downloads complete! Total time: ${totalDuration} seconds`;
+            statusDiv.querySelector('.status-text').textContent = `Downloads complete! Total time: ${totalDuration} seconds`;
+            statusDiv.querySelector('.progress-bar').style.width = '100%';
             
             const performanceLog = document.getElementById('performanceLog');
             const performanceDetails = document.getElementById('performanceDetails');
-            performanceLog.style.display = "block";
+            performanceLog.style.display = 'block';
             performanceDetails.innerHTML = `
                 <p>📊 Total files processed: ${totalFiles}</p>
                 <p>⏱️ Total time: ${totalDuration} seconds</p>
@@ -126,7 +131,6 @@ async function processDirectDownloads(selected_links, workerCount = 3) {
                 <p>🔄 Parallel downloads used: ${workerCount}</p>
             `;
             
-            // Also log to console
             console.log('Download Performance Metrics:');
             console.log(`Total files processed: ${totalFiles}`);
             console.log(`Total time: ${totalDuration} seconds`);
@@ -137,7 +141,6 @@ async function processDirectDownloads(selected_links, workerCount = 3) {
         }
     }, 100);
 
-    // Start downloads
     await downloadWorker.addToQueue(urls);
 }
 
@@ -170,6 +173,7 @@ async function downloadMemory(url) {
 }
 
 async function processZipDownloads(selected_links) {
+    const startTime = performance.now();
     let totalFiles = selected_links.length;
     let processedFiles = 0;
     
@@ -178,12 +182,21 @@ async function processZipDownloads(selected_links) {
         statusDiv = document.createElement('div');
         statusDiv.id = 'downloadStatus';
         statusDiv.className = 'status';
-        document.querySelector('.download-list').appendChild(statusDiv);
+        statusDiv.innerHTML = `
+            <div class="status-text"></div>
+            <div class="progress-container">
+                <div class="progress-bar"></div>
+            </div>
+        `;
+        document.querySelector('.download-options').insertAdjacentElement('afterend', statusDiv);
     }
 
     const updateStatus = () => {
         const percent = Math.round((processedFiles / totalFiles) * 100);
-        statusDiv.textContent = `Processing: ${processedFiles}/${totalFiles} files (${percent}%)`;
+        const duration = ((performance.now() - startTime) / 1000).toFixed(2);
+        statusDiv.querySelector('.status-text').textContent = 
+            `Processing: ${processedFiles}/${totalFiles} files (${percent}%) - Time: ${duration}s`;
+        statusDiv.querySelector('.progress-bar').style.width = `${percent}%`;
     };
     updateStatus();
 
@@ -225,8 +238,9 @@ async function processZipDownloads(selected_links) {
         }
     }
 
-    // Create ZIP files
-    statusDiv.textContent = 'Creating ZIP files...';
+    statusDiv.querySelector('.status-text').textContent = 'Creating ZIP files...';
+    statusDiv.querySelector('.progress-bar').style.width = '100%';
+
     for (const [yearMonth, zip] of zips) {
         const [year, month] = yearMonth.split('-');
         try {
@@ -247,8 +261,21 @@ async function processZipDownloads(selected_links) {
             console.error(`Error creating zip for ${year}-${month}:`, error);
         }
     }
+
+    const totalDuration = ((performance.now() - startTime) / 1000).toFixed(2);
+    const filesPerSecond = (totalFiles/totalDuration).toFixed(2);
     
-    statusDiv.textContent = 'Download complete!';
+    statusDiv.querySelector('.status-text').textContent = 'Download complete!';
+    
+    const performanceLog = document.getElementById('performanceLog');
+    const performanceDetails = document.getElementById('performanceDetails');
+    performanceLog.style.display = 'block';
+    performanceDetails.innerHTML = `
+        <p>📊 Total files processed: ${totalFiles}</p>
+        <p>⏱️ Total time: ${totalDuration} seconds</p>
+        <p>⚡ Average speed: ${filesPerSecond} files/second</p>
+    `;
+    
     setTimeout(() => statusDiv.remove(), 5000);
 }
 

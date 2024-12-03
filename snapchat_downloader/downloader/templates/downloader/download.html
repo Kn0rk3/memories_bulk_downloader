@@ -29,16 +29,18 @@
         
         .download-methods {
             display: flex;
+            flex-direction: row;  /* Changed to row */
             gap: 15px;
+            margin-bottom: 20px;
         }
-        .download-method-container {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
+
+        .download-button-container {
+            flex: 1;  /* Each container takes equal space */
+            max-width: 50%;  /* Ensure each side takes no more than half */
         }
-        
+
         .download-button {
-            flex: 1;
+            width: 100%;
             padding: 15px;
             text-align: left;
             background-color: #4CAF50;
@@ -47,14 +49,20 @@
             border-radius: 4px;
             cursor: pointer;
         }
-        
+
         .download-button:hover {
             background-color: #45a049;
         }
-        
+
         .download-button:disabled {
             background-color: #cccccc;
             cursor: not-allowed;
+        }
+
+        .download-method-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
         }
 
         .performance-details {
@@ -65,12 +73,32 @@
             font-family: monospace;
         }
 
+        .progress-container {
+            width: 100%;
+            background-color: #f0f0f0;
+            border-radius: 4px;
+            padding: 1px;
+            margin-top: 10px;
+        }
+
+        .progress-bar {
+            height: 20px;
+            background-color: #4CAF50;
+            border-radius: 4px;
+            width: 0%;
+            transition: width 0.3s ease;
+        }
+
         .status {
             margin: 20px 0;
             padding: 10px;
             border: 1px solid #ccc;
             background: #f9f9f9;
             border-radius: 4px;
+        }
+
+        .status-text {
+            margin-bottom: 10px;
         }
 
         .download-list {
@@ -100,15 +128,16 @@
     
     <div class="download-options">
         <h3>Configure Download:</h3>
-        
-        <!-- Download method buttons with configuration -->
+
         <div class="download-methods">
-            <div class="download-method-container">
+            <!-- Left side: Direct download with config -->
+            <div class="download-button-container">
                 <button id="directDownloadButton" class="download-button">
                     <strong>Download Files Directly</strong><br>
                     <span style="font-size: 0.9em">Files stay in your browser, manual organization needed</span>
                 </button>
-                <!-- Parallel download configuration aligned with direct download button -->
+                
+                <!-- Parallel download config under direct download button -->
                 <div class="download-config" style="margin-top: 10px; background-color: #f5f5f5; padding: 10px; border-radius: 4px;">
                     <label for="workerCount">Parallel Downloads (1-6):</label>
                     <input type="range" id="workerCount" min="1" max="6" value="3" style="width: 100%; margin: 5px 0;">
@@ -118,11 +147,14 @@
                     </div>
                 </div>
             </div>
-            
-            <button id="zipDownloadButton" class="download-button">
-                <strong>Download as ZIP Files</strong><br>
-                <span style="font-size: 0.9em">Organized by month, requires server processing</span>
-            </button>
+
+            <!-- Right side: ZIP download -->
+            <div class="download-button-container">
+                <button id="zipDownloadButton" class="download-button">
+                    <strong>Download as ZIP Files</strong><br>
+                    <span style="font-size: 0.9em">Organized by month, requires server processing</span>
+                </button>
+            </div>
         </div>
     </div>
 
