@@ -330,10 +330,46 @@ async function getSelectedLinks() {
 
 // ============= Initialize Event Handlers =============
 document.addEventListener('DOMContentLoaded', () => {
+
+    const userAgent = navigator.userAgent.toLowerCase();
+    const warningDiv = document.querySelector('.browser-warning');
+    const firefoxWarning = document.querySelector('.firefox-warning');
+    const edgeWarning = document.querySelector('.edge-warning');
+
     const directButton = document.getElementById('directDownloadButton');
     const zipButton = document.getElementById('zipDownloadButton');
     const workerCount = document.getElementById('workerCount');
     const workerCountDisplay = document.getElementById('workerCountDisplay');
+
+    // More reliable Firefox detection
+    const isFirefox = navigator.userAgent.includes('Firefox/');
+    // Edge detection
+    const isEdge = navigator.userAgent.includes('Edg/');
+
+    if (isFirefox) {
+        warningDiv.style.display = 'block';
+        firefoxWarning.style.display = 'block';
+        
+        directButton.insertAdjacentHTML('afterend', 
+            '<div style="color: #856404; font-size: 0.9em; margin-top: 5px;">' +
+            '⚠️ Video downloads do not work in Firefox</div>'
+        );
+    }
+
+    if (isEdge) {
+        warningDiv.style.display = 'block';
+        edgeWarning.style.display = 'block';
+        
+        directButton.insertAdjacentHTML('afterend', 
+            '<div style="color: #856404; font-size: 0.9em; margin-top: 5px;">' +
+            '⚠️ Direct downloads require Balanced or Basic tracking prevention</div>'
+        );
+    }
+
+    // Hide warning div if no warnings are active
+    if (firefoxWarning.style.display === 'none' && edgeWarning.style.display === 'none') {
+        warningDiv.style.display = 'none';
+    }
 
     // Update display when slider changes
     if (workerCount) {
