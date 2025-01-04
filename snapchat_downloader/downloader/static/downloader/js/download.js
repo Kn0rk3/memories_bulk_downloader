@@ -346,6 +346,12 @@ document.addEventListener('DOMContentLoaded', () => {
     // Edge detection
     const isEdge = navigator.userAgent.includes('Edg/');
 
+    // currently the zip file feature is not enabled at this point because of legal reasons
+    zipButton.insertAdjacentHTML('afterend', 
+        '<div style="color: #856404; font-size: 0.9em; margin-top: 5px;">' +
+        'This feature is currently not available due to legal and data protectional reasons</div>'
+    );
+
     if (isFirefox) {
         warningDiv.style.display = 'block';
         firefoxWarning.style.display = 'block';
@@ -380,7 +386,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     directButton.onclick = async () => {
         directButton.disabled = true;
-        zipButton.disabled = true;
+        //zipButton.disabled = true;
         try {
             const links = await getSelectedLinks();
             if (links) {
@@ -390,13 +396,13 @@ document.addEventListener('DOMContentLoaded', () => {
             console.error('Error:', error);
         } finally {
             directButton.disabled = false;
-            zipButton.disabled = false;
+            //zipButton.disabled = true;
         }
     };
 
     zipButton.onclick = async () => {
         directButton.disabled = true;
-        zipButton.disabled = true;
+        //zipButton.disabled = true;
         try {
             const links = await getSelectedLinks();
             if (links) {
@@ -406,7 +412,7 @@ document.addEventListener('DOMContentLoaded', () => {
             console.error('Error:', error);
         } finally {
             directButton.disabled = false;
-            zipButton.disabled = false;
+            //zipButton.disabled = true;
         }
     };
 });

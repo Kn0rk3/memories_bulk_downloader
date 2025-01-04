@@ -14,6 +14,7 @@ import os
 import psutil
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
+
 def determine_worker_count():
     # Base worker count on logical cores
     cpu_cores = os.cpu_count()
@@ -37,45 +38,68 @@ def determine_worker_count():
     return worker_count
 
 def upload(request):
+
     if request.method == 'POST' and request.FILES.get('html_file'):
         html_file = request.FILES['html_file']
-        soup = BeautifulSoup(html_file, 'html.parser')
+
+        # Validate file type using both extension and content check
+        if not html_file.name.endswith('.html'):
+            return HttpResponse("Invalid file type. Only HTML files are allowed.", status=400)
         
-        # Parse the HTML and extract the download links
-        links = soup.find_all('a', href=re.compile(r'javascript:downloadMemories'))
+        # Read a small chunk to check if it looks like HTML
+        sample = html_file.read(1024).decode('utf-8').lower().strip()
+        html_file.seek(0)  # Reset file pointer
         
-        # Group the links by year and month
-        grouped_links = {}
-        for link in links:
-            date_time_element = link.find_previous('td', text=re.compile(r'\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} UTC'))
-            if date_time_element:
-                date_time = date_time_element.text.strip()
-                year, month = date_time[:4], date_time[5:7]
-                if year not in grouped_links:
-                    grouped_links[year] = {}
-                if month not in grouped_links[year]:
-                    grouped_links[year][month] = []
-                # Add data-yearmonth attribute to the link
-                grouped_links[year][month].append(f'<a href="{link["href"]}" data-yearmonth="{year}-{month}">{link.text}</a>')
-            else:
-                print(f"Warning: Date and time not found for link: {link}")
+        if not sample.startswith('<!doctype html') and not sample.startswith('<html'):
+            return HttpResponse("Invalid file content. File must be valid HTML.", status=400)
         
-        # Count the number of media files for each month
-        links_count = {}
-        for year, months in grouped_links.items():
-            links_count[year] = {}
-            for month, links in months.items():
-                links_count[year][month] = len(links)
-        
-        # Store the grouped_links and links_count in the session
-        request.session['grouped_links'] = grouped_links
-        request.session['links_count'] = links_count
-        
-        template = loader.get_template('downloader/download.html')
-        context = {
-            'links_count': links_count,
-        }
-        return HttpResponse(template.render(context, request))
+        # Limit file size to 30MB
+        file_size_limit = 30 * 1024 * 1024  # 30MB in bytes
+        if html_file.size > file_size_limit:
+            return HttpResponse("File size exceeds the limit of 30MB.", status=400)
+
+        try:            
+            # Parse the sanitized HTML with BeautifulSoup
+            soup = BeautifulSoup(html_file, 'html.parser')       
+            
+            # Parse the HTML and extract the download links
+            links = soup.find_all('a', href=re.compile(r'javascript:downloadMemories'))
+            
+            # Group the links by year and month
+            grouped_links = {}
+            for link in links:
+                date_time_element = link.find_previous('td', text=re.compile(r'\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} UTC'))
+                if date_time_element:
+                    date_time = date_time_element.text.strip()
+                    year, month = date_time[:4], date_time[5:7]
+                    if year not in grouped_links:
+                        grouped_links[year] = {}
+                    if month not in grouped_links[year]:
+                        grouped_links[year][month] = []
+                    # Add data-yearmonth attribute to the link
+                    grouped_links[year][month].append(f'<a href="{link["href"]}" data-yearmonth="{year}-{month}">{link.text}</a>')
+                else:
+                    print(f"Warning: Date and time not found for link: {link}")
+            
+            # Count the number of media files for each month
+            links_count = {}
+            for year, months in grouped_links.items():
+                links_count[year] = {}
+                for month, links in months.items():
+                    links_count[year][month] = len(links)
+            
+            # Store the grouped_links and links_count in the session
+            request.session['grouped_links'] = grouped_links
+            request.session['links_count'] = links_count
+            
+            template = loader.get_template('downloader/download.html')
+            context = {
+                'links_count': links_count,
+            }
+            return HttpResponse(template.render(context, request))
+    
+        except Exception as e:
+                return HttpResponse(f"Error parsing HTML file: {str(e)}", status=400)
     
     return render(request, 'downloader/upload.html')
 
@@ -174,6 +198,7 @@ def download_file(request):
     
     return JsonResponse({'error': 'Invalid request method'}, status=400)
 
+'''
 @csrf_exempt
 def batch_download(request):
     if request.method == 'POST':
@@ -252,3 +277,4 @@ def download_single_file(url):
             }
     
     return {'success': False, 'error': 'Download failed'}
+    '''
