@@ -9,6 +9,6 @@ snapchat_downloader
 
 ## Notes to do
 - label to advertise that the app does not store any data after the job is done
-- Add impressum and data privacy and license
 - add buy me a coffee
 - add a cool label
+- make production ready by adding environment variables for secret key, debug setting, allowed_hosts (which needs to be the url)

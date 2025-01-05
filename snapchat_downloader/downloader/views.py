@@ -2,6 +2,8 @@ from django.shortcuts import render
 from django.template import loader
 from django.http import JsonResponse, HttpResponse
 from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.csrf import csrf_protect
+
 import re
 import json
 import requests
@@ -9,11 +11,8 @@ from bs4 import BeautifulSoup
 from PIL import Image
 import io
 import base64
-
 import os
 import psutil
-from concurrent.futures import ThreadPoolExecutor, as_completed
-
 
 def determine_worker_count():
     # Base worker count on logical cores
@@ -37,6 +36,7 @@ def determine_worker_count():
     print(f"Optimal worker count determined: {worker_count} (CPU: {cpu_usage}%, Memory: {memory_usage}%)")
     return worker_count
 
+@csrf_protect
 def upload(request):
 
     if request.method == 'POST' and request.FILES.get('html_file'):

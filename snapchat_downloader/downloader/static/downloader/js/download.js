@@ -4,6 +4,7 @@ class DownloadWorker {
         this.queue = [];
         this.activeDownloads = 0;
         this.maxConcurrent = maxConcurrent;
+        this.downloadDelay = 100; // Add delay between downloads
     }
 
     async addToQueue(urls) {
@@ -17,6 +18,8 @@ class DownloadWorker {
             const url = this.queue.shift();
             try {
                 await this.downloadFile(url);
+                // Add delay between downloads
+                await new Promise(resolve => setTimeout(resolve, this.downloadDelay));
             } finally {
                 this.activeDownloads--;
                 this.processQueue();
@@ -39,18 +42,43 @@ class DownloadWorker {
                         document.body.appendChild(iframe);
                         
                         try {
+                            // Create a unique ID for download link
+                            const downloadId = `download-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+                            
                             iframe.contentWindow.document.write(`
-                                <a id="download" download href="${xhttp.responseText}">Download</a>
+                                <a id="${downloadId}" download href="${xhttp.responseText}">Download</a>
                                 <script>
-                                    document.getElementById('download').click();
+                                    var link = document.getElementById('${downloadId}');
+                                    link.click();
+                                    // Signal parent when download starts
+                                    link.addEventListener('click', function() {
+                                        window.parent.postMessage('download-started', '*');
+                                    });
                                 </script>
                             `);
                             
-                            setTimeout(() => {
+                            // Listen for download start
+                            const cleanup = () => {
                                 document.body.removeChild(iframe);
-                            }, 1000);
+                                resolve(true);
+                            };
                             
-                            resolve(true);
+                            const messageHandler = (event) => {
+                                if (event.data === 'download-started') {
+                                    window.removeEventListener('message', messageHandler);
+                                    // Give the download a chance to begin
+                                    setTimeout(cleanup, 1000);
+                                }
+                            };
+                            
+                            window.addEventListener('message', messageHandler);
+                            
+                            // Fallback cleanup in case message never arrives
+                            setTimeout(() => {
+                                window.removeEventListener('message', messageHandler);
+                                cleanup();
+                            }, 2000);
+                            
                         } catch (e) {
                             document.body.removeChild(iframe);
                             reject(e);
@@ -349,7 +377,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // currently the zip file feature is not enabled at this point because of legal reasons
     zipButton.insertAdjacentHTML('afterend', 
         '<div style="color: #856404; font-size: 0.9em; margin-top: 5px;">' +
-        'This feature is currently not available due to legal and data protectional reasons</div>'
+        'This feature is not yet available.</div>'
     );
 
     if (isFirefox) {
