@@ -1,227 +1,136 @@
 {% load static %}
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Download Snapchat Memories</title>
-    <meta name="csrf-token" content="{{ csrf_token }}">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.0-beta3/dist/css/bootstrap.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <script src="{% static 'downloader/js/download.js' %}"></script>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            margin: 20px;
-            max-width: 800px;
-            margin: 0 auto;
-            padding: 20px;
-        }
-        
-        .download-options {
-            margin: 20px 0;
-            padding: 15px;
-            background-color: #fff;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-        }
-        
-        .download-config {
-            margin-bottom: 20px;
-        }
-        
-        .download-methods {
-            display: flex;
-            flex-direction: row;  /* Changed to row */
-            gap: 15px;
-            margin-bottom: 20px;
-        }
-
-        .download-button-container {
-            flex: 1;  /* Each container takes equal space */
-            max-width: 50%;  /* Ensure each side takes no more than half */
-        }
-
-        .download-button {
-            width: 100%;
-            padding: 15px;
-            text-align: left;
-            background-color: #4CAF50;
-            color: white;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-        }
-
-        .download-button:hover {
-            background-color: #45a049;
-        }
-
-        .download-button:disabled {
-            background-color: #cccccc;
-            cursor: not-allowed;
-        }
-
-        .download-method-container {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-        }
-
-        .performance-details {
-            margin-top: 10px;
-            padding: 10px;
-            background-color: #f5f5f5;
-            border-radius: 4px;
-            font-family: monospace;
-        }
-
-        .progress-container {
-            width: 100%;
-            background-color: #f0f0f0;
-            border-radius: 4px;
-            padding: 1px;
-            margin-top: 10px;
-        }
-
-        .progress-bar {
-            height: 20px;
-            background-color: #4CAF50;
-            border-radius: 4px;
-            width: 0%;
-            transition: width 0.3s ease;
-        }
-
-        .status {
-            margin: 20px 0;
-            padding: 10px;
-            border: 1px solid #ccc;
-            background: #f9f9f9;
-            border-radius: 4px;
-        }
-
-        .status-text {
-            margin-bottom: 10px;
-        }
-
-        .download-list {
-            margin: 20px 0;
-        }
-
-        .download-list ul {
-            list-style-type: none;
-            padding-left: 20px;
-        }
-
-        .month-item {
-            margin: 5px 0;
-        }
-
-        .year-item {
-            margin: 10px 0;
-        }
-
-        .year-item label {
-            font-weight: bold;
-        }
-    </style>
+    <meta name="csrf-token" content="{{ csrf_token }}">
 </head>
 <body>
-    <h1>Download Snapchat Memories</h1>
-   
-    <div class="browser-warning">
-        <div class="warning-content" style="background-color: #fff3cd; border: 1px solid #ffeeba; color: #856404; padding: 15px; border-radius: 4px; margin-bottom: 20px;">
-            <h4 style="margin-top: 0; color: #856404;">⚠️ Browser Compatibility Notice</h4>
-            
-            <!-- Firefox Warning -->
-            <div class="firefox-warning" style="margin-bottom: 15px; display: none;">
-                <p style="margin-bottom: 10px;">
-                    <strong>Firefox Users:</strong> Due to browser-specific video encoding limitations, video downloads may not work correctly in Firefox. For the best experience when downloading videos:
-                </p>
-                <ul style="margin-bottom: 0;">
-                    <li>Use Chrome, Edge, or Safari for downloading videos</li>
-                    <li>Firefox works fine for downloading photos</li>
-                    <li>Consider using the ZIP download option in Firefox, which handles videos correctly</li>
-                </ul>
-            </div>
-    
-            <!-- Edge Warning -->
-            <div class="edge-warning" style="display: none;">
-                <p style="margin-bottom: 10px;">
-                    <strong>Edge Users:</strong> For direct downloads to work properly, you need to adjust your tracking prevention settings:
-                </p>
-                <ul style="margin-bottom: 0;">
-                    <li>Go to Edge Settings (... menu) → Privacy, search and services</li>
-                    <li>Under "Tracking prevention", set it to "Balanced" or "Basic"</li>
-                    <!-- <li>If you prefer to keep Strict tracking prevention, use the ZIP download option instead</li> -->
-                </ul>
-            </div>
-        </div>
-    </div>
-
-    <div class="download-options">
-        <h3>Configure Download:</h3>
-
-        <div class="download-methods">
-            <!-- Left side: Direct download with config -->
-            <div class="download-button-container">
-                <button id="directDownloadButton" class="download-button">
-                    <strong>Download Files Directly</strong><br>
-                    <span style="font-size: 0.9em">Files stay in your browser, manual organization needed</span>
-                </button>
+    <div class="container my-5">
+        <h1 class="text-center mb-4">Download Snapchat Memories</h1>
+        
+        <div class="browser-warning">
+            <div class="warning-content alert alert-warning">
+                <h4 class="alert-heading">⚠️ Browser Compatibility Notice</h4>
                 
-                <!-- Parallel download config under direct download button -->
-                <div class="download-config" style="margin-top: 10px; background-color: #f5f5f5; padding: 10px; border-radius: 4px;">
-                    <label for="workerCount">Parallel Downloads (1-6):</label>
-                    <input type="range" id="workerCount" min="1" max="6" value="3" style="width: 100%; margin: 5px 0;">
-                    <div style="display: flex; justify-content: space-between;">
-                        <span style="color: #666; font-size: 0.9em;">Current: <span id="workerCountDisplay">3</span></span>
-                        <span style="color: #666; font-size: 0.9em;">Higher = faster but may fail</span>
-                    </div>
+                <!-- Firefox Warning -->
+                <div class="firefox-warning mb-3" style="display: none;">
+                    <p class="mb-2">
+                        <strong>Firefox Users:</strong> Due to browser-specific video encoding limitations, video downloads may not work correctly in Firefox. For the best experience when downloading videos:
+                    </p>
+                    <ul class="mb-0">
+                        <li>Use Chrome, Edge, or Safari for downloading videos</li>
+                        <li>Firefox works fine for downloading photos</li>
+                        <li>Consider using the ZIP download option in Firefox, which handles videos correctly</li>
+                    </ul>
+                </div>
+        
+                <!-- Edge Warning -->
+                <div class="edge-warning" style="display: none;">
+                    <p class="mb-2">
+                        <strong>Edge Users:</strong> For direct downloads to work properly, you need to adjust your tracking prevention settings:
+                    </p>
+                    <ul class="mb-0">
+                        <li>Go to Edge Settings (... menu) → Privacy, search and services</li>
+                        <li>Under "Tracking prevention", set it to "Balanced" or "Basic"</li>
+                    </ul>
                 </div>
             </div>
-
-            <!-- Right side: ZIP download -->
-            <div class="download-button-container">
-                <button disabled id="zipDownloadButton" class="download-button">
-                    <strong>Download as ZIP Files</strong><br>
-                    <span style="font-size: 0.9em">Organized by month, requires server processing</span>
-                </button>
-            </div> 
         </div>
-    </div>
 
-    <!-- Performance log section -->
-    <div id="performanceLog" style="margin-top: 20px; display: none;">
-        <h3>Download Performance</h3>
-        <div id="performanceDetails" class="performance-details">
-            <!-- Performance metrics will be inserted here -->
+        <div class="download-options card mb-4">
+            <div class="card-body">
+                <h3 class="card-title">Configure Download:</h3>
+
+                <div class="download-methods row">
+                    <!-- Left side: Direct download with config -->
+                    <div class="download-button-container col-md-6">
+                        <button id="directDownloadButton" class="download-button btn btn-primary btn-block mb-3">
+                            <strong>Download Files Directly</strong><br>
+                            <span class="small">Files stay in your browser, manual organization needed</span>
+                        </button>
+                        
+                        <!-- Parallel download config under direct download button -->
+                        <div class="download-config bg-light p-3 rounded">
+                            <label for="workerCount">Parallel Downloads (1-6):</label>
+                            <input type="range" id="workerCount" min="1" max="6" value="3" class="form-range">
+                            <div class="d-flex justify-content-between">
+                                <span class="text-muted small">Current: <span id="workerCountDisplay">3</span></span>
+                                <span class="text-muted small">Higher = faster but may fail</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Right side: ZIP download -->
+                    <div class="download-button-container col-md-6">
+                        <button disabled id="zipDownloadButton" class="download-button btn btn-primary btn-block">
+                            <strong>Download as ZIP Files</strong><br>
+                            <span class="small">Organized by month, requires server processing</span>
+                        </button>
+                    </div> 
+                </div>
+            </div>
         </div>
-    </div>
 
-    <div class="download-list">
-        <form>
-            {% if links_count %}
-                <ul>
-                {% for year, months in links_count.items %}
-                    <li class="year-item">
-                        <label>
-                            <input type="checkbox" name="selected_years" value="{{ year }}"> {{ year }}
-                        </label>
-                        <ul>
-                        {% for month, count in months.items %}
-                            <li class="month-item">
-                                <label>
-                                    <input type="checkbox" name="selected_months" value="{{ year }}-{{ month }}"> 
-                                    {{ month }} ({{ count }} media files)
-                                </label>
-                            </li>
-                        {% endfor %}
-                        </ul>
-                    </li>
-                {% endfor %}
-                </ul>
-            {% else %}
-                <p>No memories found.</p>
-            {% endif %}
-        </form>
+        <!-- Performance log section -->
+        <div id="performanceLog" class="mb-4" style="display: none;">
+            <h3>Download Progress</h3>
+            <div id="downloadStatus" class="status">
+                <div class="status-text"></div>
+                <div class="progress">
+                    <div class="progress-bar" role="progressbar" style="width: 0%;" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"></div>
+                </div>
+            </div>
+            <div id="performanceDetails" class="performance-details bg-light p-3 rounded mt-3">
+                <!-- Performance metrics will be inserted here -->
+            </div>
+        </div>
+
+        <!-- Performance log section -->
+        <!-- <div id="performanceLog" class="mb-4" style="display: none;">
+            <h3>Download Performance</h3>
+            <div id="performanceDetails" class="performance-details bg-light p-3 rounded"> -->
+                <!-- Performance metrics will be inserted here -->
+            <!-- </div>
+        </div> -->
+
+        <div class="download-list">
+            <div class="card">
+                <div class="card-body">
+                    <form>
+                        {% if links_count %}
+                            <ul class="list-unstyled">
+                            {% for year, months in links_count.items %}
+                                <li class="year-item">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" name="selected_years" value="{{ year }}" id="year-{{ year }}">
+                                        <label class="form-check-label fw-bold" for="year-{{ year }}">{{ year }}</label>
+                                    </div>
+                                    <ul class="list-unstyled ms-3">
+                                    {% for month, count in months.items %}
+                                        <li class="month-item">
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="checkbox" name="selected_months" value="{{ year }}-{{ month }}" id="month-{{ year }}-{{ month }}">
+                                                <label class="form-check-label" for="month-{{ year }}-{{ month }}">{{ month }} ({{ count }} media files)</label>
+                                            </div>
+                                        </li>
+                                    {% endfor %}
+                                    </ul>
+                                </li>
+                            {% endfor %}
+                            </ul>
+                        {% else %}
+                            <p>No memories found.</p>
+                        {% endif %}
+                    </form>
+                </div>
+            </div>
+        </div>
     </div>
 </body>
 </html>

@@ -99,19 +99,20 @@ async function processDirectDownloads(selected_links, workerCount = 3) {
     let totalFiles = selected_links.length;
     let processedFiles = 0;
     
-    let statusDiv = document.getElementById('downloadStatus');
+    /* let statusDiv = document.getElementById('downloadStatus');
     if (!statusDiv) {
         statusDiv = document.createElement('div');
         statusDiv.id = 'downloadStatus';
         statusDiv.className = 'status';
         statusDiv.innerHTML = `
             <div class="status-text"></div>
-            <div class="progress-container">
-                <div class="progress-bar"></div>
+            <div class="progress">
+                <div class="progress-bar" role="progressbar" style="width: 0%;" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"></div>
             </div>
         `;
         document.querySelector('.download-options').insertAdjacentElement('afterend', statusDiv);
-    }
+    } */
+    let statusDiv = document.getElementById('downloadStatus');
 
     const updateStatus = () => {
         const percent = Math.round((processedFiles / totalFiles) * 100);
@@ -137,7 +138,7 @@ async function processDirectDownloads(selected_links, workerCount = 3) {
         }
     }
 
-    const progressInterval = setInterval(() => {
+    /* const progressInterval = setInterval(() => {
         processedFiles = totalFiles - downloadWorker.queue.length - downloadWorker.activeDownloads;
         updateStatus();
         
@@ -167,7 +168,40 @@ async function processDirectDownloads(selected_links, workerCount = 3) {
             
             setTimeout(() => statusDiv.remove(), 5000);
         }
+    }, 100); */
+    const performanceLog = document.getElementById('performanceLog');
+    performanceLog.style.display = 'block';
+    
+    const progressInterval = setInterval(() => {
+        processedFiles = totalFiles - downloadWorker.queue.length - downloadWorker.activeDownloads;
+        updateStatus();
+        
+        if (processedFiles === totalFiles) {
+            clearInterval(progressInterval);
+            const totalDuration = ((performance.now() - startTime) / 1000).toFixed(2);
+            const filesPerSecond = (totalFiles/totalDuration).toFixed(2);
+            
+            statusDiv.querySelector('.status-text').textContent = `Downloads complete! Total time: ${totalDuration} seconds`;
+            statusDiv.querySelector('.progress-bar').style.width = '100%';
+            
+            const performanceDetails = document.getElementById('performanceDetails');
+            performanceDetails.innerHTML = `
+                <p>📊 Total files processed: ${totalFiles}</p>
+                <p>⏱️ Total time: ${totalDuration} seconds</p>
+                <p>⚡ Average speed: ${filesPerSecond} files/second</p>
+                <p>🔄 Parallel downloads used: ${workerCount}</p>
+            `;
+            
+            console.log('Download Performance Metrics:');
+            console.log(`Total files processed: ${totalFiles}`);
+            console.log(`Total time: ${totalDuration} seconds`);
+            console.log(`Average speed: ${filesPerSecond} files/second`);
+            console.log(`Parallel downloads used: ${workerCount}`);
+            
+            setTimeout(() => statusDiv.remove(), 5000);
+        }
     }, 100);
+
 
     await downloadWorker.addToQueue(urls);
 }
@@ -212,8 +246,8 @@ async function processZipDownloads(selected_links) {
         statusDiv.className = 'status';
         statusDiv.innerHTML = `
             <div class="status-text"></div>
-            <div class="progress-container">
-                <div class="progress-bar"></div>
+            <div class="progress">
+                <div class="progress-bar" role="progressbar" style="width: 0%;" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"></div>
             </div>
         `;
         document.querySelector('.download-options').insertAdjacentElement('afterend', statusDiv);
