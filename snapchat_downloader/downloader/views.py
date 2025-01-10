@@ -11,8 +11,7 @@ from bs4 import BeautifulSoup
 from PIL import Image
 import io
 import base64
-import os
-import psutil
+
 
 """ def determine_worker_count():
     # Base worker count on logical cores
