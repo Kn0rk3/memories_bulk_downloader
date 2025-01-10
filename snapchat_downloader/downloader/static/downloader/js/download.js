@@ -4,7 +4,10 @@ class DownloadWorker {
         this.queue = [];
         this.activeDownloads = 0;
         this.maxConcurrent = maxConcurrent;
-        this.downloadDelay = 100; // Add delay between downloads
+        this.downloadDelay = 100;
+        this.successCount = 0;
+        this.failureCount = 0;
+        this.errors = {};
     }
 
     async addToQueue(urls) {
@@ -18,8 +21,12 @@ class DownloadWorker {
             const url = this.queue.shift();
             try {
                 await this.downloadFile(url);
-                // Add delay between downloads
+                this.successCount++;
                 await new Promise(resolve => setTimeout(resolve, this.downloadDelay));
+            } catch (error) {
+                this.failureCount++;
+                this.errors[error.message] = (this.errors[error.message] || 0) + 1;
+                console.error(`Download failed: ${error.message}`);
             } finally {
                 this.activeDownloads--;
                 this.processQueue();
@@ -36,28 +43,33 @@ class DownloadWorker {
             
             xhttp.onreadystatechange = function () {
                 if (xhttp.readyState == 4) {
-                    if (xhttp.status == 200) {
-                        const iframe = document.createElement('iframe');
-                        iframe.style.display = 'none';
-                        document.body.appendChild(iframe);
-                        
+                    if (xhttp.status === 403) {
+                        reject(new Error('Link expired'));
+                    } else if (xhttp.status !== 200) {
+                        reject(new Error(`Failed with status ${xhttp.status}`));
+                    } else {
                         try {
-                            // Create a unique ID for download link
+                            const mediaUrl = xhttp.responseText.trim();
+                            if (!mediaUrl) {
+                                reject(new Error('Empty media URL received'));
+                                return;
+                            }
+
+                            const iframe = document.createElement('iframe');
+                            iframe.style.display = 'none';
+                            document.body.appendChild(iframe);
+                            
                             const downloadId = `download-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
                             
                             iframe.contentWindow.document.write(`
-                                <a id="${downloadId}" download href="${xhttp.responseText}">Download</a>
+                                <a id="${downloadId}" download href="${mediaUrl}">Download</a>
                                 <script>
                                     var link = document.getElementById('${downloadId}');
                                     link.click();
-                                    // Signal parent when download starts
-                                    link.addEventListener('click', function() {
-                                        window.parent.postMessage('download-started', '*');
-                                    });
+                                    window.parent.postMessage('download-started', '*');
                                 </script>
                             `);
                             
-                            // Listen for download start
                             const cleanup = () => {
                                 document.body.removeChild(iframe);
                                 resolve(true);
@@ -66,30 +78,32 @@ class DownloadWorker {
                             const messageHandler = (event) => {
                                 if (event.data === 'download-started') {
                                     window.removeEventListener('message', messageHandler);
-                                    // Give the download a chance to begin
                                     setTimeout(cleanup, 1000);
                                 }
                             };
                             
                             window.addEventListener('message', messageHandler);
                             
-                            // Fallback cleanup in case message never arrives
                             setTimeout(() => {
                                 window.removeEventListener('message', messageHandler);
                                 cleanup();
                             }, 2000);
                             
                         } catch (e) {
-                            document.body.removeChild(iframe);
-                            reject(e);
+                            reject(new Error('Failed to process download'));
                         }
-                    } else {
-                        reject(new Error('Failed to get CDN URL'));
                     }
                 }
             };
             
-            xhttp.send(parts[1]);
+            xhttp.onerror = () => reject(new Error('Network error'));
+            xhttp.ontimeout = () => reject(new Error('Request timed out'));
+            
+            try {
+                xhttp.send(parts[1]);
+            } catch (e) {
+                reject(new Error('Failed to send request'));
+            }
         });
     }
 }
@@ -99,7 +113,7 @@ async function processDirectDownloads(selected_links, workerCount = 3) {
     let totalFiles = selected_links.length;
     let processedFiles = 0;
     
-    /* let statusDiv = document.getElementById('downloadStatus');
+    let statusDiv = document.getElementById('downloadStatus');
     if (!statusDiv) {
         statusDiv = document.createElement('div');
         statusDiv.id = 'downloadStatus';
@@ -111,14 +125,13 @@ async function processDirectDownloads(selected_links, workerCount = 3) {
             </div>
         `;
         document.querySelector('.download-options').insertAdjacentElement('afterend', statusDiv);
-    } */
-    let statusDiv = document.getElementById('downloadStatus');
+    }
 
     const updateStatus = () => {
         const percent = Math.round((processedFiles / totalFiles) * 100);
         const duration = ((performance.now() - startTime) / 1000).toFixed(2);
         statusDiv.querySelector('.status-text').textContent = 
-            `Processing: ${processedFiles}/${totalFiles} files (${percent}%) - Time: ${duration}s - Using ${workerCount} parallel downloads`;
+            `Processing: ${processedFiles}/${totalFiles} files (${percent}%) - Time: ${duration}s`;
         statusDiv.querySelector('.progress-bar').style.width = `${percent}%`;
     };
     updateStatus();
@@ -138,37 +151,6 @@ async function processDirectDownloads(selected_links, workerCount = 3) {
         }
     }
 
-    /* const progressInterval = setInterval(() => {
-        processedFiles = totalFiles - downloadWorker.queue.length - downloadWorker.activeDownloads;
-        updateStatus();
-        
-        if (processedFiles === totalFiles) {
-            clearInterval(progressInterval);
-            const totalDuration = ((performance.now() - startTime) / 1000).toFixed(2);
-            const filesPerSecond = (totalFiles/totalDuration).toFixed(2);
-            
-            statusDiv.querySelector('.status-text').textContent = `Downloads complete! Total time: ${totalDuration} seconds`;
-            statusDiv.querySelector('.progress-bar').style.width = '100%';
-            
-            const performanceLog = document.getElementById('performanceLog');
-            const performanceDetails = document.getElementById('performanceDetails');
-            performanceLog.style.display = 'block';
-            performanceDetails.innerHTML = `
-                <p>📊 Total files processed: ${totalFiles}</p>
-                <p>⏱️ Total time: ${totalDuration} seconds</p>
-                <p>⚡ Average speed: ${filesPerSecond} files/second</p>
-                <p>🔄 Parallel downloads used: ${workerCount}</p>
-            `;
-            
-            console.log('Download Performance Metrics:');
-            console.log(`Total files processed: ${totalFiles}`);
-            console.log(`Total time: ${totalDuration} seconds`);
-            console.log(`Average speed: ${filesPerSecond} files/second`);
-            console.log(`Parallel downloads used: ${workerCount}`);
-            
-            setTimeout(() => statusDiv.remove(), 5000);
-        }
-    }, 100); */
     const performanceLog = document.getElementById('performanceLog');
     performanceLog.style.display = 'block';
     
@@ -181,27 +163,63 @@ async function processDirectDownloads(selected_links, workerCount = 3) {
             const totalDuration = ((performance.now() - startTime) / 1000).toFixed(2);
             const filesPerSecond = (totalFiles/totalDuration).toFixed(2);
             
-            statusDiv.querySelector('.status-text').textContent = `Downloads complete! Total time: ${totalDuration} seconds`;
+            const successCount = downloadWorker.successCount;
+            const failureCount = downloadWorker.failureCount;
+            
+            let statusMessage = `Downloads complete! Time: ${totalDuration}s. `;
+            if (failureCount > 0) {
+                statusMessage += `⚠️ ${failureCount} files failed to download.`;
+                statusDiv.querySelector('.status-text').style.color = '#856404';
+            } else {
+                statusMessage += '✅ All files downloaded successfully!';
+                statusDiv.querySelector('.status-text').style.color = '#155724';
+            }
+            
+            statusDiv.querySelector('.status-text').textContent = statusMessage;
             statusDiv.querySelector('.progress-bar').style.width = '100%';
             
             const performanceDetails = document.getElementById('performanceDetails');
             performanceDetails.innerHTML = `
-                <p>📊 Total files processed: ${totalFiles}</p>
-                <p>⏱️ Total time: ${totalDuration} seconds</p>
-                <p>⚡ Average speed: ${filesPerSecond} files/second</p>
-                <p>🔄 Parallel downloads used: ${workerCount}</p>
+                <div class="download-summary">
+                    <p>📊 Total files processed: ${totalFiles}</p>
+                    <p>✅ Successfully downloaded: ${successCount}</p>
+                    ${failureCount > 0 ? `<p>❌ Failed downloads: ${failureCount}</p>` : ''}
+                    <p>⏱️ Total time: ${totalDuration} seconds</p>
+                    <p>⚡ Average speed: ${filesPerSecond} files/second</p>
+                    <p>🔄 Parallel downloads used: ${workerCount}</p>
+                </div>
             `;
             
-            console.log('Download Performance Metrics:');
-            console.log(`Total files processed: ${totalFiles}`);
-            console.log(`Total time: ${totalDuration} seconds`);
-            console.log(`Average speed: ${filesPerSecond} files/second`);
-            console.log(`Parallel downloads used: ${workerCount}`);
-            
-            setTimeout(() => statusDiv.remove(), 5000);
+            if (failureCount > 0 && downloadWorker.errors) {
+                const errorSummary = document.createElement('div');
+                errorSummary.className = 'error-summary mt-4';
+                
+                const errorDetails = Object.entries(downloadWorker.errors)
+                    .map(([error, count]) => `
+                        <div class="error-item">
+                            <span class="error-count badge bg-warning text-dark">${count}</span>
+                            <span class="error-message">${error}</span>
+                        </div>
+                    `).join('');
+
+                errorSummary.innerHTML = `
+                    <div class="alert alert-warning">
+                        <h5 class="alert-heading mb-3">⚠️ Download Failures</h5>
+                        <div class="error-list mb-3">
+                            ${errorDetails}
+                        </div>
+                        ${Object.keys(downloadWorker.errors).some(e => e.includes('expired')) ? 
+                            `<div class="alert alert-info mb-0">
+                                <small>📝 Note: Snapchat download links expire after 7 days. Please ensure you're using a recently exported HTML file.</small>
+                            </div>` : ''
+                        }
+                    </div>
+                `;
+
+                performanceDetails.appendChild(errorSummary);
+            }
         }
     }, 100);
-
 
     await downloadWorker.addToQueue(urls);
 }
@@ -392,14 +410,11 @@ async function getSelectedLinks() {
 
 // ============= Initialize Event Handlers =============
 document.addEventListener('DOMContentLoaded', () => {
-
     const userAgent = navigator.userAgent.toLowerCase();
-    const warningDiv = document.querySelector('.browser-warning');
     const firefoxWarning = document.querySelector('.firefox-warning');
     const edgeWarning = document.querySelector('.edge-warning');
 
     const directButton = document.getElementById('directDownloadButton');
-    const zipButton = document.getElementById('zipDownloadButton');
     const workerCount = document.getElementById('workerCount');
     const workerCountDisplay = document.getElementById('workerCountDisplay');
 
@@ -408,14 +423,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Edge detection
     const isEdge = navigator.userAgent.includes('Edg/');
 
-    // currently the zip file feature is not enabled at this point because of legal reasons
-    zipButton.insertAdjacentHTML('afterend', 
-        '<div style="color: #856404; font-size: 0.9em; margin-top: 5px;">' +
-        'This feature is not yet available.</div>'
-    );
-
     if (isFirefox) {
-        warningDiv.style.display = 'block';
         firefoxWarning.style.display = 'block';
         
         directButton.insertAdjacentHTML('afterend', 
@@ -425,18 +433,12 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     if (isEdge) {
-        warningDiv.style.display = 'block';
         edgeWarning.style.display = 'block';
         
         directButton.insertAdjacentHTML('afterend', 
             '<div style="color: #856404; font-size: 0.9em; margin-top: 5px;">' +
             '⚠️ Direct downloads require Balanced or Basic tracking prevention</div>'
         );
-    }
-
-    // Hide warning div if no warnings are active
-    if (firefoxWarning.style.display === 'none' && edgeWarning.style.display === 'none') {
-        warningDiv.style.display = 'none';
     }
 
     // Update display when slider changes
@@ -448,7 +450,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     directButton.onclick = async () => {
         directButton.disabled = true;
-        //zipButton.disabled = true;
         try {
             const links = await getSelectedLinks();
             if (links) {
@@ -458,23 +459,6 @@ document.addEventListener('DOMContentLoaded', () => {
             console.error('Error:', error);
         } finally {
             directButton.disabled = false;
-            //zipButton.disabled = true;
-        }
-    };
-
-    zipButton.onclick = async () => {
-        directButton.disabled = true;
-        //zipButton.disabled = true;
-        try {
-            const links = await getSelectedLinks();
-            if (links) {
-                await processZipDownloads(links);
-            }
-        } catch (error) {
-            console.error('Error:', error);
-        } finally {
-            directButton.disabled = false;
-            //zipButton.disabled = true;
         }
     };
 });

@@ -14,7 +14,7 @@ import base64
 import os
 import psutil
 
-def determine_worker_count():
+""" def determine_worker_count():
     # Base worker count on logical cores
     cpu_cores = os.cpu_count()
     cpu_usage = psutil.cpu_percent(interval=1)
@@ -34,7 +34,7 @@ def determine_worker_count():
         worker_count = cpu_cores // 2  # Using half of cores as default
 
     print(f"Optimal worker count determined: {worker_count} (CPU: {cpu_usage}%, Memory: {memory_usage}%)")
-    return worker_count
+    return worker_count """
 
 @csrf_protect
 def upload(request):
