@@ -8,7 +8,6 @@ snapchat_downloader
 - python manage.py runserver
 
 ## Notes to do
-- label to advertise that the app does not store any data after the job is done
 - add buy me a coffee
-- add a cool label
+- add github link
 - make production ready by adding environment variables for secret key, debug setting, allowed_hosts (which needs to be the url)
