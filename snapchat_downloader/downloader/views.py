@@ -3,40 +3,18 @@ from django.template import loader
 from django.http import JsonResponse, HttpResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.csrf import csrf_protect
+from django.conf import settings
 
 import re
 import json
-import requests
 from bs4 import BeautifulSoup
-from PIL import Image
-import io
-import base64
-
-
-""" def determine_worker_count():
-    # Base worker count on logical cores
-    cpu_cores = os.cpu_count()
-    cpu_usage = psutil.cpu_percent(interval=1)
-    memory_info = psutil.virtual_memory()
-    memory_usage = memory_info.percent
-
-    # More conservative limits
-    min_workers = max(1, cpu_cores // 4)  # Using 1/4 of cores as minimum
-    max_workers = min(16, cpu_cores)      # Using core count as maximum, capped at 16
-
-    # Adjust worker count based on CPU and memory load
-    if cpu_usage > 70 or memory_usage > 80:
-        worker_count = min_workers
-    elif cpu_usage < 40 and memory_usage < 60:
-        worker_count = max_workers
-    else:
-        worker_count = cpu_cores // 2  # Using half of cores as default
-
-    print(f"Optimal worker count determined: {worker_count} (CPU: {cpu_usage}%, Memory: {memory_usage}%)")
-    return worker_count """
 
 @csrf_protect
 def upload(request):
+
+    context = {
+        'app_title': settings.APP_TITLE
+    }
 
     if request.method == 'POST' and request.FILES.get('html_file'):
         html_file = request.FILES['html_file']
@@ -94,16 +72,18 @@ def upload(request):
             template = loader.get_template('downloader/download.html')
             context = {
                 'links_count': links_count,
+                'app_title': settings.APP_TITLE
             }
             return HttpResponse(template.render(context, request))
     
         except Exception as e:
                 return HttpResponse(f"Error parsing HTML file: {str(e)}", status=400)
     
-    return render(request, 'downloader/upload.html')
+    return render(request, 'downloader/upload.html', context)
 
 @csrf_exempt
 def download(request):
+
     if request.method == 'POST':
         try:
             data = json.loads(request.body)
@@ -127,7 +107,7 @@ def download(request):
             
             return JsonResponse({
                 'selected_links': selected_links, 
-                'total_links': total_links
+                'total_links': total_links                
             })
             
         except json.JSONDecodeError as e:
@@ -140,140 +120,3 @@ def download(request):
             }, status=500)
     
     return JsonResponse({'error': 'Invalid request'}, status=400)
-
-@csrf_exempt
-def download_file(request):
-    if request.method == 'POST':
-        try:
-            data = json.loads(request.body)
-            url = data.get('url')
-            
-            if not url:
-                return JsonResponse({'success': False, 'error': 'URL is required'})
-            
-            def process_single_file(url):
-                # Parse the URL and parameters
-                url_parts = url.split('?')
-                base_url = url_parts[0]
-                params = url_parts[1] if len(url_parts) > 1 else ''
-                
-                # Get media URL
-                response = requests.post(
-                    base_url, 
-                    data=params,
-                    headers={'Content-Type': 'application/x-www-form-urlencoded'}
-                )
-                
-                if response.status_code == 200:
-                    media_url = response.text.strip()
-                    media_response = requests.get(media_url)
-                    
-                    if media_response.status_code == 200:
-                        file_content = media_response.content
-                        
-                        try:
-                            image = Image.open(io.BytesIO(file_content))
-                            file_extension = ".jpg" if image.format == "JPEG" else f".{image.format.lower()}"
-                        except (IOError, AttributeError):
-                            file_extension = ".mov"
-                        
-                        return {
-                            'success': True,
-                            'content': base64.b64encode(file_content).decode('utf-8'),
-                            'extension': file_extension
-                        }
-                
-                return {'success': False, 'error': 'Download failed'}
-
-            # Process single file
-            result = process_single_file(url)
-            return JsonResponse(result)
-                
-        except Exception as e:
-            return JsonResponse({
-                'success': False,
-                'error': f'Server error: {str(e)}'
-            })
-    
-    return JsonResponse({'error': 'Invalid request method'}, status=400)
-
-'''
-@csrf_exempt
-def batch_download(request):
-    if request.method == 'POST':
-        try:
-            data = json.loads(request.body)
-            urls = data.get('urls', [])
-            
-            if not urls:
-                return JsonResponse({'success': False, 'error': 'URLs required'})
-
-            worker_count = determine_worker_count()
-            print(f"Processing {len(urls)} files with {worker_count} workers")
-            
-            results = []
-            completed = 0
-            total = len(urls)
-
-            with ThreadPoolExecutor(max_workers=worker_count) as executor:
-                futures = [executor.submit(download_single_file, url) for url in urls]
-                for future in as_completed(futures):
-                    try:
-                        result = future.result()
-                        results.append(result)
-                        completed += 1
-                        if completed % 5 == 0:  # Log progress every 5 files
-                            print(f"Progress: {completed}/{total} files processed")
-                    except Exception as e:
-                        results.append({
-                            'success': False,
-                            'error': str(e)
-                        })
-            
-            return JsonResponse({
-                'success': True,
-                'results': results
-            })
-                
-        except Exception as e:
-            return JsonResponse({
-                'success': False,
-                'error': f'Server error: {str(e)}'
-            })
-    
-    return JsonResponse({'error': 'Invalid request method'}, status=400)
-
-def download_single_file(url):
-    # Parse the URL and parameters
-    url_parts = url.split('?')
-    base_url = url_parts[0]
-    params = url_parts[1] if len(url_parts) > 1 else ''
-    
-    # Get media URL
-    response = requests.post(
-        base_url, 
-        data=params,
-        headers={'Content-Type': 'application/x-www-form-urlencoded'}
-    )
-    
-    if response.status_code == 200:
-        media_url = response.text.strip()
-        media_response = requests.get(media_url)
-        
-        if media_response.status_code == 200:
-            file_content = media_response.content
-            
-            try:
-                image = Image.open(io.BytesIO(file_content))
-                file_extension = ".jpg" if image.format == "JPEG" else f".{image.format.lower()}"
-            except (IOError, AttributeError):
-                file_extension = ".mov"
-            
-            return {
-                'success': True,
-                'content': base64.b64encode(file_content).decode('utf-8'),
-                'extension': file_extension
-            }
-    
-    return {'success': False, 'error': 'Download failed'}
-    '''

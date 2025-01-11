@@ -10,3 +10,11 @@ snapchat_downloader/downloader/migrations/__pycache__/*
 snapchat_downloader/snapchat_downloader/__pycache__/*
 snapchat_downloader/uploads/*
 snapchat_downloader/db.sqlite3
+
+# Environment variables
+.env
+local.env
+*.env
+
+# But allow .env.example
+!example.env

@@ -7,6 +7,8 @@ snapchat_downloader
 - python manage.py showmigrations
 - python manage.py runserver
 
+- .env file for the local development
+
 ## Notes to do
 - add buy me a coffee
 - add github link

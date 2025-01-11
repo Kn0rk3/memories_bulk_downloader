@@ -270,19 +270,19 @@ document.addEventListener('DOMContentLoaded', () => {
     if (isFirefox) {
         firefoxWarning.style.display = 'block';
         
-        directButton.insertAdjacentHTML('afterend', 
+        /* directButton.insertAdjacentHTML('afterend', 
             '<div style="color: #856404; font-size: 0.9em; margin-top: 5px;">' +
             '⚠️ Video downloads do not work in Firefox</div>'
-        );
+        ); */
     }
 
     if (isEdge) {
         edgeWarning.style.display = 'block';
         
-        directButton.insertAdjacentHTML('afterend', 
+        /* directButton.insertAdjacentHTML('afterend', 
             '<div style="color: #856404; font-size: 0.9em; margin-top: 5px;">' +
             '⚠️ Direct downloads require Balanced or Basic tracking prevention</div>'
-        );
+        ); */
     }
 
     // Update display when slider changes
