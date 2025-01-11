@@ -1,7 +1,6 @@
 from django.shortcuts import render
 from django.template import loader
 from django.http import JsonResponse, HttpResponse
-from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.csrf import csrf_protect
 from django.conf import settings
 
@@ -13,7 +12,9 @@ from bs4 import BeautifulSoup
 def upload(request):
 
     context = {
-        'app_title': settings.APP_TITLE
+        'app_title': settings.APP_TITLE,
+        'github_url': settings.GITHUB_URL,
+        'coffee_url': settings.COFFEE_URL
     }
 
     if request.method == 'POST' and request.FILES.get('html_file'):
@@ -30,10 +31,11 @@ def upload(request):
         if not sample.startswith('<!doctype html') and not sample.startswith('<html'):
             return HttpResponse("Invalid file content. File must be valid HTML.", status=400)
         
-        # Limit file size to 30MB
-        file_size_limit = 30 * 1024 * 1024  # 30MB in bytes
+        # Limit file size 
+        file_size_limit = settings.MAX_UPLOAD_SIZE
         if html_file.size > file_size_limit:
-            return HttpResponse("File size exceeds the limit of 30MB.", status=400)
+            mb = file_size_limit / 1024 / 1024
+            return HttpResponse("File size exceeds the limit of " + str(mb) +"MB.", status=400)
 
         try:            
             # Parse the sanitized HTML with BeautifulSoup
@@ -72,7 +74,9 @@ def upload(request):
             template = loader.get_template('downloader/download.html')
             context = {
                 'links_count': links_count,
-                'app_title': settings.APP_TITLE
+                'app_title': settings.APP_TITLE,
+                'github_url': settings.GITHUB_URL,
+                'coffee_url': settings.COFFEE_URL
             }
             return HttpResponse(template.render(context, request))
     
@@ -81,7 +85,7 @@ def upload(request):
     
     return render(request, 'downloader/upload.html', context)
 
-@csrf_exempt
+@csrf_protect
 def download(request):
 
     if request.method == 'POST':

@@ -28,8 +28,11 @@ SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure-default-key-for-dev')
 
 ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', '').split(',')
 
-# Upload settings
-MAX_UPLOAD_SIZE = int(os.environ.get('MAX_UPLOAD_SIZE', 52428800))  # 50MB default
+MAX_UPLOAD_SIZE=int(os.environ.get('MAX_UPLOAD_SIZE', 31457280))
+
+# Social links
+GITHUB_URL = os.environ.get('GITHUB_URL', '')
+COFFEE_URL = os.environ.get('COFFEE_URL', '')
 
 # Application definition
 

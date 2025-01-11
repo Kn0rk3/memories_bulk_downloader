@@ -1,4 +1,4 @@
-# snapchat_downloader
+# bulk memory download
 snapchat_downloader
 
 # Setup after all is installed
@@ -7,9 +7,4 @@ snapchat_downloader
 - python manage.py showmigrations
 - python manage.py runserver
 
-- .env file for the local development
-
-## Notes to do
-- add buy me a coffee
-- add github link
-- make production ready by adding environment variables for secret key, debug setting, allowed_hosts (which needs to be the url)
+- change .env file for the local development

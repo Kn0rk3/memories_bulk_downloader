@@ -10,6 +10,8 @@ def check_env_variables():
         'ALLOWED_HOSTS',
         'DEBUG',
         'MAX_UPLOAD_SIZE',
+        'GITHUB_URL',
+        'COFFEE_URL'
     ]
     
     missing_vars = []
