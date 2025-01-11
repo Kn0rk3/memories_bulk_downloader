@@ -1,6 +1,6 @@
 # Bulk Memories Downloader
 
-A privacy-focused web application that helps you download your Snapchat Memories efficiently and securely. This tool processes your Snapchat Memories export file (`memories_history.html`) directly in your browser, ensuring your personal data never leaves your device.
+A privacy-focused web application that helps you download your Snapchat memories efficiently and securely. This tool processes your Snapchat memories export file (`memories_history.html`) directly in your browser, ensuring your personal data never leaves your device.
 
 ## 🔑 Key Features
 
@@ -12,7 +12,7 @@ A privacy-focused web application that helps you download your Snapchat Memories
 
 ## ⚡ Quick Start
 
-1. Export your Snapchat Memories data from your Snapchat account
+1. Export your Snapchat memories data from your Snapchat account
 2. Upload the `memories_history.html` file to the application
 3. Select the months/years you want to download
 4. Start downloading your memories directly to your device
