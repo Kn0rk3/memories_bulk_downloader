@@ -1,3 +1,4 @@
+import logging  
 from django.shortcuts import render
 from django.template import loader
 from django.http import JsonResponse, HttpResponse
@@ -8,9 +9,11 @@ import re
 import json
 from bs4 import BeautifulSoup
 
+# Get a logger instance
+logger = logging.getLogger(__name__)
+
 @csrf_protect
 def upload(request):
-
     context = {
         'app_title': settings.APP_TITLE,
         'github_url': settings.GITHUB_URL,
@@ -66,10 +69,26 @@ def upload(request):
                 links_count[year] = {}
                 for month, links in months.items():
                     links_count[year][month] = len(links)
-            
+                    
             # Store the grouped_links and links_count in the session
             request.session['grouped_links'] = grouped_links
             request.session['links_count'] = links_count
+
+            # Logging 
+            total_links = 0
+            for year, months in links_count.items():
+                for month, count in months.items():
+                    logger.info(
+                        f"Processed {count} links for {year}-{month}",  
+                        extra={
+                            'year': year,
+                            'month': month,
+                            'link_count': count
+                        }
+                    )
+                    total_links += count
+
+            logger.info(f"Total links processed: {total_links}")
             
             template = loader.get_template('downloader/download.html')
             context = {
