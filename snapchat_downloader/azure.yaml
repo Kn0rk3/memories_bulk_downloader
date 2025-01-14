@@ -1,0 +1,7 @@
+# azure.yaml
+name: snapchat-downloader
+services:
+  - name: web
+    project: .
+    language: python
+    host: appservice

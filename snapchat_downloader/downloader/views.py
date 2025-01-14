@@ -14,10 +14,15 @@ logger = logging.getLogger(__name__)
 
 @csrf_protect
 def upload(request):
+
+    file_size_limit = settings.MAX_UPLOAD_SIZE
+    mb = str(int(file_size_limit / 1024 / 1024))
+
     context = {
         'app_title': settings.APP_TITLE,
         'github_url': settings.GITHUB_URL,
-        'coffee_url': settings.COFFEE_URL
+        'coffee_url': settings.COFFEE_URL,
+        'filesize': mb
     }
 
     if request.method == 'POST' and request.FILES.get('html_file'):
@@ -35,10 +40,8 @@ def upload(request):
             return HttpResponse("Invalid file content. File must be valid HTML.", status=400)
         
         # Limit file size 
-        file_size_limit = settings.MAX_UPLOAD_SIZE
         if html_file.size > file_size_limit:
-            mb = file_size_limit / 1024 / 1024
-            return HttpResponse("File size exceeds the limit of " + str(mb) +"MB.", status=400)
+            return HttpResponse("File size exceeds the limit of " + mb +"MB.", status=400)
 
         try:            
             # Parse the sanitized HTML with BeautifulSoup

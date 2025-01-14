@@ -18,3 +18,5 @@ local.env
 
 # But allow .env.example
 !example.env
+.vscode/settings.json
+snapchat_downloader/deploy.zip
